@@ -1,12 +1,22 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Image from "next/image"
-import Link from "next/link"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Heart, MapPin, Briefcase, GraduationCap, ChevronLeft, ChevronRight, Lock, Verified } from "lucide-react"
+import { useState, useEffect } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Heart,
+  MapPin,
+  Briefcase,
+  GraduationCap,
+  ChevronLeft,
+  ChevronRight,
+  Lock,
+  Verified,
+} from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 const profiles = [
   {
@@ -75,20 +85,48 @@ const profiles = [
     interests: ["Business", "Tennis", "Reading"],
     verified: true,
   },
-]
+];
 
 export function FeaturedProfiles() {
-  const [scrollPosition, setScrollPosition] = useState(0)
+  const [scrollPosition, setScrollPosition] = useState(0);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      setIsAuthenticated(!!session);
+      setIsLoading(false);
+    };
+
+    checkAuth();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const scroll = (direction: "left" | "right") => {
-    const container = document.getElementById("profiles-container")
+    const container = document.getElementById("profiles-container");
     if (container) {
-      const scrollAmount = 320
+      const scrollAmount = 320;
       const newPosition =
-        direction === "left" ? Math.max(0, scrollPosition - scrollAmount) : scrollPosition + scrollAmount
-      container.scrollTo({ left: newPosition, behavior: "smooth" })
-      setScrollPosition(newPosition)
+        direction === "left"
+          ? Math.max(0, scrollPosition - scrollAmount)
+          : scrollPosition + scrollAmount;
+      container.scrollTo({ left: newPosition, behavior: "smooth" });
+      setScrollPosition(newPosition);
     }
+  };
+
+  if (isLoading || !isAuthenticated) {
+    return null;
   }
 
   return (
@@ -98,9 +136,12 @@ export function FeaturedProfiles() {
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
           <div>
             <p className="text-primary font-semibold mb-3">Featured Profiles</p>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-balance">Meet Your Potential Match</h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-balance">
+              Meet Your Potential Match
+            </h2>
             <p className="text-muted-foreground text-lg max-w-xl">
-              Handpicked profiles based on compatibility and preferences. All profiles are 100% verified.
+              Handpicked profiles based on compatibility and preferences. All
+              profiles are 100% verified.
             </p>
           </div>
           <div className="flex gap-2">
@@ -184,14 +225,22 @@ export function FeaturedProfiles() {
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {profile.interests.map((interest) => (
-                      <Badge key={interest} variant="secondary" className="text-xs">
+                      <Badge
+                        key={interest}
+                        variant="secondary"
+                        className="text-xs"
+                      >
                         {interest}
                       </Badge>
                     ))}
                   </div>
                 </div>
 
-                <Button className="w-full mt-4 rounded-full bg-transparent" variant="outline" asChild>
+                <Button
+                  className="w-full mt-4 rounded-full bg-transparent"
+                  variant="outline"
+                  asChild
+                >
                   <Link href={`/profile/${profile.id}`}>
                     <Lock className="h-4 w-4 mr-2" />
                     Unlock Profile
@@ -210,5 +259,5 @@ export function FeaturedProfiles() {
         </div>
       </div>
     </section>
-  )
+  );
 }

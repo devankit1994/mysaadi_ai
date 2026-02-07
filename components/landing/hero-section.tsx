@@ -1,18 +1,35 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import Link from "next/link"
-import Image from "next/image"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { ArrowRight, Sparkles, Heart, Shield, Users } from "lucide-react"
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { supabase } from "@/lib/supabase";
+import Image from "next/image";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { ArrowRight, Sparkles, Heart, Shield, Users } from "lucide-react";
 
 export function HeroSection() {
-  const [mounted, setMounted] = useState(false)
+  const [mounted, setMounted] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
-    setMounted(true)
-  }, [])
+    setMounted(true);
+    const checkAuth = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      setIsLoggedIn(!!session);
+    };
+    checkAuth();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   return (
     <section className="relative min-h-screen flex items-center pt-20 overflow-hidden">
@@ -31,7 +48,10 @@ export function HeroSection() {
           <div
             className={`space-y-8 ${mounted ? "animate-in fade-in slide-in-from-left-10 duration-700" : "opacity-0"}`}
           >
-            <Badge variant="secondary" className="px-4 py-2 text-sm font-medium rounded-full">
+            <Badge
+              variant="secondary"
+              className="px-4 py-2 text-sm font-medium rounded-full"
+            >
               <Sparkles className="h-4 w-4 mr-2 text-primary" />
               Trusted by 50,000+ Users
             </Badge>
@@ -40,7 +60,11 @@ export function HeroSection() {
               Find Your{" "}
               <span className="text-primary relative">
                 Soulmate
-                <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 200 12" fill="none">
+                <svg
+                  className="absolute -bottom-2 left-0 w-full"
+                  viewBox="0 0 200 12"
+                  fill="none"
+                >
                   <path
                     d="M2 10C50 2 150 2 198 10"
                     stroke="currentColor"
@@ -50,22 +74,35 @@ export function HeroSection() {
                   />
                 </svg>
               </span>{" "}
-              in Just <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">₹39</span>
+              in Just{" "}
+              <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                ₹39
+              </span>
             </h1>
 
             <p className="text-lg md:text-xl text-muted-foreground max-w-lg leading-relaxed">
-              The modern matrimony platform built for Gen-Z. Discover meaningful connections with verified profiles,
-              smart AI matching, and the most affordable unlock pricing in India.
+              The modern matrimony platform built for Gen-Z. Discover meaningful
+              connections with verified profiles, smart AI matching, and the
+              most affordable unlock pricing in India.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button size="lg" asChild className="rounded-full px-8 h-14 text-lg group">
-                <Link href="/login">
+              <Button
+                size="lg"
+                asChild
+                className="rounded-full px-8 h-14 text-lg group"
+              >
+                <Link href={isLoggedIn ? "/dashboard" : "/login"}>
                   Get Started Free
                   <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
                 </Link>
               </Button>
-              <Button size="lg" variant="outline" asChild className="rounded-full px-8 h-14 text-lg bg-transparent">
+              <Button
+                size="lg"
+                variant="outline"
+                asChild
+                className="rounded-full px-8 h-14 text-lg bg-transparent"
+              >
                 <Link href="#profiles">Explore Matches</Link>
               </Button>
             </div>
@@ -95,14 +132,25 @@ export function HeroSection() {
               {/* Main profile card */}
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="relative w-72 h-96 rounded-3xl overflow-hidden shadow-2xl transform rotate-3 hover:rotate-0 transition-transform duration-500">
-                  <Image src="/beautiful-indian-woman-smiling-portrait-profession.jpg" alt="Featured profile" fill className="object-cover" />
+                  <Image
+                    src="/beautiful-indian-woman-smiling-portrait-profession.jpg"
+                    alt="Featured profile"
+                    fill
+                    className="object-cover"
+                  />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
                   <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
                     <p className="font-semibold text-xl">Priya, 26</p>
-                    <p className="text-white/80 text-sm">Software Engineer • Mumbai</p>
+                    <p className="text-white/80 text-sm">
+                      Software Engineer • Mumbai
+                    </p>
                     <div className="flex gap-2 mt-3">
-                      <Badge className="bg-white/20 text-white hover:bg-white/30">Travel</Badge>
-                      <Badge className="bg-white/20 text-white hover:bg-white/30">Music</Badge>
+                      <Badge className="bg-white/20 text-white hover:bg-white/30">
+                        Travel
+                      </Badge>
+                      <Badge className="bg-white/20 text-white hover:bg-white/30">
+                        Music
+                      </Badge>
                     </div>
                   </div>
                 </div>
@@ -116,7 +164,9 @@ export function HeroSection() {
                   </div>
                   <div>
                     <p className="font-semibold text-sm">New Match!</p>
-                    <p className="text-xs text-muted-foreground">98% Compatible</p>
+                    <p className="text-xs text-muted-foreground">
+                      98% Compatible
+                    </p>
                   </div>
                 </div>
               </div>
@@ -133,7 +183,9 @@ export function HeroSection() {
                     />
                   </div>
                   <div className="flex-1">
-                    <p className="font-semibold text-sm">Rahul sent a request</p>
+                    <p className="font-semibold text-sm">
+                      Rahul sent a request
+                    </p>
                     <p className="text-xs text-muted-foreground">2 min ago</p>
                   </div>
                 </div>
@@ -153,5 +205,5 @@ export function HeroSection() {
         </div>
       </div>
     </section>
-  )
+  );
 }

@@ -1,9 +1,17 @@
-"use client"
-
-import Link from "next/link"
-import { Heart, Instagram, Twitter, Facebook, Linkedin, Youtube, Mail, Phone, MapPin } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import Link from "next/link";
+import {
+  Heart,
+  Instagram,
+  Twitter,
+  Facebook,
+  Linkedin,
+  Youtube,
+  Mail,
+  Phone,
+  MapPin,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 const footerLinks = {
   company: [
@@ -30,7 +38,7 @@ const footerLinks = {
     { label: "Events", href: "/events" },
     { label: "Community", href: "/community" },
   ],
-}
+};
 
 const socialLinks = [
   { icon: Instagram, href: "#", label: "Instagram" },
@@ -38,7 +46,7 @@ const socialLinks = [
   { icon: Facebook, href: "#", label: "Facebook" },
   { icon: Linkedin, href: "#", label: "LinkedIn" },
   { icon: Youtube, href: "#", label: "YouTube" },
-]
+];
 
 export function Footer() {
   return (
@@ -55,12 +63,15 @@ export function Footer() {
               </span>
             </Link>
             <p className="text-background/70 mb-6 max-w-sm">
-              The modern matrimony platform for Gen-Z. Find your soulmate with verified profiles and affordable pricing.
+              The modern matrimony platform for Gen-Z. Find your soulmate with
+              verified profiles and affordable pricing.
             </p>
 
             {/* Newsletter */}
             <div className="space-y-3">
-              <p className="font-medium text-background">Subscribe to our newsletter</p>
+              <p className="font-medium text-background">
+                Subscribe to our newsletter
+              </p>
               <div className="flex gap-2">
                 <Input
                   placeholder="Enter your email"
@@ -77,7 +88,10 @@ export function Footer() {
             <ul className="space-y-3">
               {footerLinks.company.map((link) => (
                 <li key={link.href}>
-                  <Link href={link.href} className="text-background/70 hover:text-primary transition-colors">
+                  <Link
+                    href={link.href}
+                    className="text-background/70 hover:text-primary transition-colors"
+                  >
                     {link.label}
                   </Link>
                 </li>
@@ -90,7 +104,10 @@ export function Footer() {
             <ul className="space-y-3">
               {footerLinks.support.map((link) => (
                 <li key={link.href}>
-                  <Link href={link.href} className="text-background/70 hover:text-primary transition-colors">
+                  <Link
+                    href={link.href}
+                    className="text-background/70 hover:text-primary transition-colors"
+                  >
                     {link.label}
                   </Link>
                 </li>
@@ -103,7 +120,10 @@ export function Footer() {
             <ul className="space-y-3">
               {footerLinks.legal.map((link) => (
                 <li key={link.href}>
-                  <Link href={link.href} className="text-background/70 hover:text-primary transition-colors">
+                  <Link
+                    href={link.href}
+                    className="text-background/70 hover:text-primary transition-colors"
+                  >
                     {link.label}
                   </Link>
                 </li>
@@ -116,7 +136,10 @@ export function Footer() {
             <ul className="space-y-3">
               {footerLinks.explore.map((link) => (
                 <li key={link.href}>
-                  <Link href={link.href} className="text-background/70 hover:text-primary transition-colors">
+                  <Link
+                    href={link.href}
+                    className="text-background/70 hover:text-primary transition-colors"
+                  >
                     {link.label}
                   </Link>
                 </li>
@@ -148,7 +171,9 @@ export function Footer() {
       <div className="border-t border-background/10">
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-sm text-background/70">© 2026 MySaadi. All rights reserved.</p>
+            <p className="text-sm text-background/70">
+              © 2026 MySaadi. All rights reserved.
+            </p>
             <div className="flex items-center gap-4">
               {socialLinks.map((social) => (
                 <Link
@@ -165,5 +190,5 @@ export function Footer() {
         </div>
       </div>
     </footer>
-  )
+  );
 }

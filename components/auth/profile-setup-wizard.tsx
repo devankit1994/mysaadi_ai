@@ -1,17 +1,29 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   User,
   Heart,
@@ -28,8 +40,9 @@ import {
   Loader2,
   Upload,
   X,
-} from "lucide-react"
-import { cn } from "@/lib/utils"
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 
 const steps = [
   { id: 1, title: "Basic Info", icon: User },
@@ -37,7 +50,7 @@ const steps = [
   { id: 3, title: "Photos", icon: Camera },
   { id: 4, title: "Lifestyle", icon: Sparkles },
   { id: 5, title: "About Me", icon: User },
-]
+];
 
 const interests = [
   "Travel",
@@ -56,10 +69,25 @@ const interests = [
   "Fashion",
   "Food",
   "Nature",
-]
+];
 
-const religions = ["Hindu", "Muslim", "Christian", "Sikh", "Jain", "Buddhist", "Other", "Prefer not to say"]
-const educationLevels = ["High School", "Bachelor's", "Master's", "PhD", "Other"]
+const religions = [
+  "Hindu",
+  "Muslim",
+  "Christian",
+  "Sikh",
+  "Jain",
+  "Buddhist",
+  "Other",
+  "Prefer not to say",
+];
+const educationLevels = [
+  "High School",
+  "Bachelor's",
+  "Master's",
+  "PhD",
+  "Other",
+];
 const professions = [
   "Software Engineer",
   "Doctor",
@@ -71,12 +99,54 @@ const professions = [
   "Finance",
   "Student",
   "Other",
-]
+];
+
+const states = [
+  "Andaman and Nicobar Islands",
+  "Andhra Pradesh",
+  "Arunachal Pradesh",
+  "Assam",
+  "Bihar",
+  "Chandigarh",
+  "Chhattisgarh",
+  "Dadra and Nagar Haveli and Daman and Diu",
+  "Delhi",
+  "Goa",
+  "Gujarat",
+  "Haryana",
+  "Himachal Pradesh",
+  "Jammu and Kashmir",
+  "Jharkhand",
+  "Karnataka",
+  "Kerala",
+  "Ladakh",
+  "Lakshadweep",
+  "Madhya Pradesh",
+  "Maharashtra",
+  "Manipur",
+  "Meghalaya",
+  "Mizoram",
+  "Nagaland",
+  "Odisha",
+  "Puducherry",
+  "Punjab",
+  "Rajasthan",
+  "Sikkim",
+  "Tamil Nadu",
+  "Telangana",
+  "Tripura",
+  "Uttar Pradesh",
+  "Uttarakhand",
+  "West Bengal",
+];
 
 export function ProfileSetupWizard() {
-  const router = useRouter()
-  const [currentStep, setCurrentStep] = useState(1)
-  const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter();
+  const [currentStep, setCurrentStep] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [pendingPhotos, setPendingPhotos] = useState<Record<string, File>>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form data
   const [formData, setFormData] = useState({
@@ -106,11 +176,11 @@ export function ProfileSetupWizard() {
     // About
     bio: "",
     interests: [] as string[],
-  })
+  });
 
   const updateFormData = (field: string, value: string | string[]) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
-  }
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
 
   const toggleInterest = (interest: string) => {
     setFormData((prev) => ({
@@ -118,47 +188,169 @@ export function ProfileSetupWizard() {
       interests: prev.interests.includes(interest)
         ? prev.interests.filter((i) => i !== interest)
         : [...prev.interests, interest],
-    }))
-  }
+    }));
+  };
 
   const handlePhotoUpload = () => {
-    // Simulate photo upload
-    const newPhoto = `/placeholder.svg?height=200&width=200&query=person portrait ${formData.photos.length + 1}`
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("File size should be less than 5MB");
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    setPendingPhotos((prev) => ({ ...prev, [objectUrl]: file }));
     setFormData((prev) => ({
       ...prev,
-      photos: [...prev.photos, newPhoto],
-    }))
-  }
+      photos: [...prev.photos, objectUrl],
+    }));
+
+    // Reset input value to allow uploading same file again if needed
+    if (event.target) {
+      event.target.value = "";
+    }
+  };
 
   const removePhoto = (index: number) => {
+    const photoUrl = formData.photos[index];
+    if (pendingPhotos[photoUrl]) {
+      URL.revokeObjectURL(photoUrl);
+      const newPending = { ...pendingPhotos };
+      delete newPending[photoUrl];
+      setPendingPhotos(newPending);
+    }
+
     setFormData((prev) => ({
       ...prev,
       photos: prev.photos.filter((_, i) => i !== index),
-    }))
-  }
+    }));
+  };
 
-  const nextStep = () => {
-    if (currentStep < steps.length) {
-      setCurrentStep((prev) => prev + 1)
+  const nextStep = async () => {
+    if (currentStep === 3) {
+      // Check if there are any pending photos to upload
+      const pendingUrls = Object.keys(pendingPhotos);
+      if (pendingUrls.length > 0) {
+        setIsUploading(true);
+        try {
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          if (!user) throw new Error("No user found");
+
+          const newPhotos = [...formData.photos];
+
+          // Process uploads
+          for (const url of pendingUrls) {
+            // Check if this specific URL is still in formData.photos (user might have removed it but we haven't cleaned up perfectly)
+            if (!newPhotos.includes(url)) continue;
+
+            const file = pendingPhotos[url];
+            const fileExt = file.name.split(".").pop();
+            const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+            const { error: uploadError } = await supabase.storage
+              .from("photos")
+              .upload(fileName, file);
+
+            if (uploadError) throw uploadError;
+
+            const {
+              data: { publicUrl },
+            } = supabase.storage.from("photos").getPublicUrl(fileName);
+
+            // Replace the blob URL with the actual Supabase URL
+            const index = newPhotos.indexOf(url);
+            if (index !== -1) {
+              newPhotos[index] = publicUrl;
+              // Clean up object URL
+              URL.revokeObjectURL(url);
+            }
+          }
+
+          // Update form data with real URLs
+          setFormData((prev) => ({ ...prev, photos: newPhotos }));
+          // Clear pending photos
+          setPendingPhotos({});
+        } catch (error) {
+          console.error("Error uploading photos:", error);
+          alert("Error uploading photos. Please try again.");
+          setIsUploading(false);
+          return; // Stop navigation if upload fails
+        } finally {
+          setIsUploading(false);
+        }
+      }
     }
-  }
+
+    if (currentStep < steps.length) {
+      setCurrentStep((prev) => prev + 1);
+    }
+  };
 
   const prevStep = () => {
     if (currentStep > 1) {
-      setCurrentStep((prev) => prev - 1)
+      setCurrentStep((prev) => prev - 1);
     }
-  }
+  };
 
   const handleSubmit = async () => {
-    setIsLoading(true)
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    localStorage.setItem("mysaadi_profile_complete", "true")
-    setIsLoading(false)
-    router.push("/dashboard")
-  }
+    setIsLoading(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-  const progress = (currentStep / steps.length) * 100
+      if (!user) {
+        throw new Error("No user found");
+      }
+
+      const { error } = await supabase.from("profiles").upsert({
+        id: user.id,
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        date_of_birth: formData.dateOfBirth,
+        gender: formData.gender,
+        city: formData.city,
+        state: formData.state,
+        looking_for: formData.lookingFor,
+        age_range_min: Number.parseInt(formData.ageRangeMin),
+        age_range_max: Number.parseInt(formData.ageRangeMax),
+        preferred_religion: formData.preferredReligion,
+        preferred_city: formData.preferredCity,
+        photos: formData.photos,
+        education: formData.education,
+        profession: formData.profession,
+        income: formData.income,
+        family_type: formData.familyType,
+        diet: formData.diet,
+        drinking: formData.drinking,
+        smoking: formData.smoking,
+        bio: formData.bio,
+        interests: formData.interests,
+        is_complete: true,
+        updated_at: new Date().toISOString(),
+      });
+
+      if (error) throw error;
+
+      localStorage.setItem("mysaadi_profile_complete", "true");
+      router.push("/dashboard");
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      // You might want to add a toast notification here
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const progress = (currentStep / steps.length) * 100;
 
   return (
     <div className="space-y-8">
@@ -180,7 +372,9 @@ export function ProfileSetupWizard() {
               onClick={() => step.id <= currentStep && setCurrentStep(step.id)}
               className={cn(
                 "flex flex-col items-center gap-2 transition-colors",
-                step.id <= currentStep ? "text-primary" : "text-muted-foreground",
+                step.id <= currentStep
+                  ? "text-primary"
+                  : "text-muted-foreground",
                 step.id < currentStep && "cursor-pointer",
               )}
             >
@@ -194,7 +388,11 @@ export function ProfileSetupWizard() {
                       : "bg-muted",
                 )}
               >
-                {step.id < currentStep ? <Check className="h-5 w-5" /> : <step.icon className="h-5 w-5" />}
+                {step.id < currentStep ? (
+                  <Check className="h-5 w-5" />
+                ) : (
+                  <step.icon className="h-5 w-5" />
+                )}
               </div>
               <span className="text-xs hidden sm:block">{step.title}</span>
             </button>
@@ -227,7 +425,9 @@ export function ProfileSetupWizard() {
                       <Input
                         id="firstName"
                         value={formData.firstName}
-                        onChange={(e) => updateFormData("firstName", e.target.value)}
+                        onChange={(e) =>
+                          updateFormData("firstName", e.target.value)
+                        }
                         placeholder="Enter your first name"
                       />
                     </div>
@@ -236,7 +436,9 @@ export function ProfileSetupWizard() {
                       <Input
                         id="lastName"
                         value={formData.lastName}
-                        onChange={(e) => updateFormData("lastName", e.target.value)}
+                        onChange={(e) =>
+                          updateFormData("lastName", e.target.value)
+                        }
                         placeholder="Enter your last name"
                       />
                     </div>
@@ -250,7 +452,9 @@ export function ProfileSetupWizard() {
                         id="dob"
                         type="date"
                         value={formData.dateOfBirth}
-                        onChange={(e) => updateFormData("dateOfBirth", e.target.value)}
+                        onChange={(e) =>
+                          updateFormData("dateOfBirth", e.target.value)
+                        }
                         className="pl-10"
                       />
                     </div>
@@ -292,7 +496,9 @@ export function ProfileSetupWizard() {
                         <Input
                           id="city"
                           value={formData.city}
-                          onChange={(e) => updateFormData("city", e.target.value)}
+                          onChange={(e) =>
+                            updateFormData("city", e.target.value)
+                          }
                           placeholder="Enter your city"
                           className="pl-10"
                         />
@@ -300,19 +506,26 @@ export function ProfileSetupWizard() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="state">State</Label>
-                      <Select value={formData.state} onValueChange={(value) => updateFormData("state", value)}>
+                      <Select
+                        value={formData.state}
+                        onValueChange={(value) =>
+                          updateFormData("state", value)
+                        }
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Select state" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="maharashtra">Maharashtra</SelectItem>
-                          <SelectItem value="delhi">Delhi</SelectItem>
-                          <SelectItem value="karnataka">Karnataka</SelectItem>
-                          <SelectItem value="telangana">Telangana</SelectItem>
-                          <SelectItem value="tamilnadu">Tamil Nadu</SelectItem>
-                          <SelectItem value="gujarat">Gujarat</SelectItem>
-                          <SelectItem value="westbengal">West Bengal</SelectItem>
-                          <SelectItem value="rajasthan">Rajasthan</SelectItem>
+                          {states.map((stateItem) => (
+                            <SelectItem
+                              key={stateItem}
+                              value={stateItem
+                                .toLowerCase()
+                                .replace(/\s+/g, "")}
+                            >
+                              {stateItem}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -327,7 +540,9 @@ export function ProfileSetupWizard() {
                     <Label>Looking For</Label>
                     <RadioGroup
                       value={formData.lookingFor}
-                      onValueChange={(value) => updateFormData("lookingFor", value)}
+                      onValueChange={(value) =>
+                        updateFormData("lookingFor", value)
+                      }
                       className="flex gap-4"
                     >
                       <div className="flex items-center space-x-2">
@@ -350,33 +565,41 @@ export function ProfileSetupWizard() {
                     <div className="flex items-center gap-4">
                       <Select
                         value={formData.ageRangeMin}
-                        onValueChange={(value) => updateFormData("ageRangeMin", value)}
+                        onValueChange={(value) =>
+                          updateFormData("ageRangeMin", value)
+                        }
                       >
                         <SelectTrigger className="w-24">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {Array.from({ length: 20 }, (_, i) => i + 18).map((age) => (
-                            <SelectItem key={age} value={age.toString()}>
-                              {age}
-                            </SelectItem>
-                          ))}
+                          {Array.from({ length: 20 }, (_, i) => i + 18).map(
+                            (age) => (
+                              <SelectItem key={age} value={age.toString()}>
+                                {age}
+                              </SelectItem>
+                            ),
+                          )}
                         </SelectContent>
                       </Select>
                       <span className="text-muted-foreground">to</span>
                       <Select
                         value={formData.ageRangeMax}
-                        onValueChange={(value) => updateFormData("ageRangeMax", value)}
+                        onValueChange={(value) =>
+                          updateFormData("ageRangeMax", value)
+                        }
                       >
                         <SelectTrigger className="w-24">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {Array.from({ length: 30 }, (_, i) => i + 21).map((age) => (
-                            <SelectItem key={age} value={age.toString()}>
-                              {age}
-                            </SelectItem>
-                          ))}
+                          {Array.from({ length: 30 }, (_, i) => i + 21).map(
+                            (age) => (
+                              <SelectItem key={age} value={age.toString()}>
+                                {age}
+                              </SelectItem>
+                            ),
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
@@ -386,14 +609,19 @@ export function ProfileSetupWizard() {
                     <Label>Preferred Religion</Label>
                     <Select
                       value={formData.preferredReligion}
-                      onValueChange={(value) => updateFormData("preferredReligion", value)}
+                      onValueChange={(value) =>
+                        updateFormData("preferredReligion", value)
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select religion" />
                       </SelectTrigger>
                       <SelectContent>
                         {religions.map((religion) => (
-                          <SelectItem key={religion} value={religion.toLowerCase()}>
+                          <SelectItem
+                            key={religion}
+                            value={religion.toLowerCase()}
+                          >
                             {religion}
                           </SelectItem>
                         ))}
@@ -406,7 +634,9 @@ export function ProfileSetupWizard() {
                     <Input
                       id="preferredCity"
                       value={formData.preferredCity}
-                      onChange={(e) => updateFormData("preferredCity", e.target.value)}
+                      onChange={(e) =>
+                        updateFormData("preferredCity", e.target.value)
+                      }
                       placeholder="Enter preferred city (or leave blank for any)"
                     />
                   </div>
@@ -418,7 +648,10 @@ export function ProfileSetupWizard() {
                 <div className="space-y-6">
                   <div className="grid grid-cols-3 gap-4">
                     {formData.photos.map((photo, index) => (
-                      <div key={index} className="relative aspect-square rounded-xl overflow-hidden group">
+                      <div
+                        key={index}
+                        className="relative aspect-square rounded-xl overflow-hidden group"
+                      >
                         <img
                           src={photo || "/placeholder.svg"}
                           alt={`Photo ${index + 1}`}
@@ -430,23 +663,42 @@ export function ProfileSetupWizard() {
                         >
                           <X className="h-4 w-4" />
                         </button>
-                        {index === 0 && <Badge className="absolute bottom-2 left-2 bg-primary">Primary</Badge>}
+                        {index === 0 && (
+                          <Badge className="absolute bottom-2 left-2 bg-primary">
+                            Primary
+                          </Badge>
+                        )}
                       </div>
                     ))}
 
                     {formData.photos.length < 6 && (
                       <button
                         onClick={handlePhotoUpload}
-                        className="aspect-square rounded-xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+                        disabled={isUploading}
+                        className="aspect-square rounded-xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <Upload className="h-8 w-8" />
-                        <span className="text-sm">Add Photo</span>
+                        {isUploading ? (
+                          <Loader2 className="h-8 w-8 animate-spin" />
+                        ) : (
+                          <Upload className="h-8 w-8" />
+                        )}
+                        <span className="text-sm">
+                          {isUploading ? "Uploading..." : "Add Photo"}
+                        </span>
                       </button>
                     )}
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      className="hidden"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                    />
                   </div>
 
                   <p className="text-sm text-muted-foreground">
-                    Add up to 6 photos. Your first photo will be your primary profile picture.
+                    Add up to 6 photos. Your first photo will be your primary
+                    profile picture.
                   </p>
                 </div>
               )}
@@ -460,7 +712,12 @@ export function ProfileSetupWizard() {
                         <GraduationCap className="h-4 w-4 inline mr-2" />
                         Education
                       </Label>
-                      <Select value={formData.education} onValueChange={(value) => updateFormData("education", value)}>
+                      <Select
+                        value={formData.education}
+                        onValueChange={(value) =>
+                          updateFormData("education", value)
+                        }
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Select education" />
                         </SelectTrigger>
@@ -481,14 +738,19 @@ export function ProfileSetupWizard() {
                       </Label>
                       <Select
                         value={formData.profession}
-                        onValueChange={(value) => updateFormData("profession", value)}
+                        onValueChange={(value) =>
+                          updateFormData("profession", value)
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select profession" />
                         </SelectTrigger>
                         <SelectContent>
                           {professions.map((profession) => (
-                            <SelectItem key={profession} value={profession.toLowerCase()}>
+                            <SelectItem
+                              key={profession}
+                              value={profession.toLowerCase()}
+                            >
                               {profession}
                             </SelectItem>
                           ))}
@@ -500,7 +762,12 @@ export function ProfileSetupWizard() {
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Annual Income</Label>
-                      <Select value={formData.income} onValueChange={(value) => updateFormData("income", value)}>
+                      <Select
+                        value={formData.income}
+                        onValueChange={(value) =>
+                          updateFormData("income", value)
+                        }
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Select income range" />
                         </SelectTrigger>
@@ -510,7 +777,9 @@ export function ProfileSetupWizard() {
                           <SelectItem value="10-20">₹10-20 LPA</SelectItem>
                           <SelectItem value="20-50">₹20-50 LPA</SelectItem>
                           <SelectItem value="above50">Above ₹50 LPA</SelectItem>
-                          <SelectItem value="prefer-not">Prefer not to say</SelectItem>
+                          <SelectItem value="prefer-not">
+                            Prefer not to say
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -522,13 +791,17 @@ export function ProfileSetupWizard() {
                       </Label>
                       <Select
                         value={formData.familyType}
-                        onValueChange={(value) => updateFormData("familyType", value)}
+                        onValueChange={(value) =>
+                          updateFormData("familyType", value)
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select family type" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="nuclear">Nuclear Family</SelectItem>
+                          <SelectItem value="nuclear">
+                            Nuclear Family
+                          </SelectItem>
                           <SelectItem value="joint">Joint Family</SelectItem>
                         </SelectContent>
                       </Select>
@@ -538,13 +811,18 @@ export function ProfileSetupWizard() {
                   <div className="grid sm:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label>Diet</Label>
-                      <Select value={formData.diet} onValueChange={(value) => updateFormData("diet", value)}>
+                      <Select
+                        value={formData.diet}
+                        onValueChange={(value) => updateFormData("diet", value)}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="vegetarian">Vegetarian</SelectItem>
-                          <SelectItem value="non-vegetarian">Non-Vegetarian</SelectItem>
+                          <SelectItem value="non-vegetarian">
+                            Non-Vegetarian
+                          </SelectItem>
                           <SelectItem value="eggetarian">Eggetarian</SelectItem>
                           <SelectItem value="vegan">Vegan</SelectItem>
                         </SelectContent>
@@ -553,13 +831,20 @@ export function ProfileSetupWizard() {
 
                     <div className="space-y-2">
                       <Label>Drinking</Label>
-                      <Select value={formData.drinking} onValueChange={(value) => updateFormData("drinking", value)}>
+                      <Select
+                        value={formData.drinking}
+                        onValueChange={(value) =>
+                          updateFormData("drinking", value)
+                        }
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="never">Never</SelectItem>
-                          <SelectItem value="occasionally">Occasionally</SelectItem>
+                          <SelectItem value="occasionally">
+                            Occasionally
+                          </SelectItem>
                           <SelectItem value="socially">Socially</SelectItem>
                           <SelectItem value="regularly">Regularly</SelectItem>
                         </SelectContent>
@@ -568,13 +853,20 @@ export function ProfileSetupWizard() {
 
                     <div className="space-y-2">
                       <Label>Smoking</Label>
-                      <Select value={formData.smoking} onValueChange={(value) => updateFormData("smoking", value)}>
+                      <Select
+                        value={formData.smoking}
+                        onValueChange={(value) =>
+                          updateFormData("smoking", value)
+                        }
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="never">Never</SelectItem>
-                          <SelectItem value="occasionally">Occasionally</SelectItem>
+                          <SelectItem value="occasionally">
+                            Occasionally
+                          </SelectItem>
                           <SelectItem value="regularly">Regularly</SelectItem>
                         </SelectContent>
                       </Select>
@@ -596,7 +888,9 @@ export function ProfileSetupWizard() {
                       rows={5}
                       className="resize-none"
                     />
-                    <p className="text-xs text-muted-foreground">{formData.bio.length}/500 characters</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formData.bio.length}/500 characters
+                    </p>
                   </div>
 
                   <div className="space-y-3">
@@ -605,7 +899,11 @@ export function ProfileSetupWizard() {
                       {interests.map((interest) => (
                         <Badge
                           key={interest}
-                          variant={formData.interests.includes(interest) ? "default" : "outline"}
+                          variant={
+                            formData.interests.includes(interest)
+                              ? "default"
+                              : "outline"
+                          }
                           className={cn(
                             "cursor-pointer transition-colors",
                             formData.interests.includes(interest)
@@ -619,7 +917,8 @@ export function ProfileSetupWizard() {
                       ))}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Select at least 3 interests ({formData.interests.length} selected)
+                      Select at least 3 interests ({formData.interests.length}{" "}
+                      selected)
                     </p>
                   </div>
                 </>
@@ -627,15 +926,29 @@ export function ProfileSetupWizard() {
 
               {/* Navigation */}
               <div className="flex justify-between pt-6 border-t border-border">
-                <Button variant="outline" onClick={prevStep} disabled={currentStep === 1} className="bg-transparent">
+                <Button
+                  variant="outline"
+                  onClick={prevStep}
+                  disabled={currentStep === 1}
+                  className="bg-transparent"
+                >
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Previous
                 </Button>
 
                 {currentStep < steps.length ? (
-                  <Button onClick={nextStep}>
-                    Next
-                    <ArrowRight className="ml-2 h-4 w-4" />
+                  <Button onClick={nextStep} disabled={isUploading}>
+                    {isUploading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        Next
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </>
+                    )}
                   </Button>
                 ) : (
                   <Button onClick={handleSubmit} disabled={isLoading}>
@@ -676,10 +989,18 @@ export function ProfileSetupWizard() {
                     </Avatar>
                     <div>
                       <p className="font-semibold">
-                        {formData.firstName || "Your"} {formData.lastName || "Name"}
+                        {formData.firstName || "Your"}{" "}
+                        {formData.lastName || "Name"}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {formData.city || "City"}, {formData.state || "State"}
+                        {formData.city || "City"},{" "}
+                        {states.find(
+                          (s) =>
+                            s.toLowerCase().replace(/\s+/g, "") ===
+                            formData.state,
+                        ) ||
+                          formData.state ||
+                          "State"}
                       </p>
                     </div>
                   </div>
@@ -698,12 +1019,20 @@ export function ProfileSetupWizard() {
                     </div>
                   )}
 
-                  {formData.bio && <p className="text-sm text-muted-foreground line-clamp-3">{formData.bio}</p>}
+                  {formData.bio && (
+                    <p className="text-sm text-muted-foreground line-clamp-3">
+                      {formData.bio}
+                    </p>
+                  )}
 
                   {formData.interests.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                       {formData.interests.slice(0, 4).map((interest) => (
-                        <Badge key={interest} variant="secondary" className="text-xs">
+                        <Badge
+                          key={interest}
+                          variant="secondary"
+                          className="text-xs"
+                        >
                           {interest}
                         </Badge>
                       ))}
@@ -721,5 +1050,5 @@ export function ProfileSetupWizard() {
         </div>
       </div>
     </div>
-  )
+  );
 }

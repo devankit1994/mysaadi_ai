@@ -1,74 +1,168 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp"
-import { Card, CardContent } from "@/components/ui/card"
-import { Loader2, Phone, ArrowRight, ArrowLeft, CheckCircle, Sparkles } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Loader2,
+  Phone,
+  ArrowRight,
+  ArrowLeft,
+  CheckCircle,
+  Sparkles,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 
-type Step = "phone" | "otp" | "success"
+type Step = "phone" | "otp" | "success";
 
 export function LoginForm() {
-  const router = useRouter()
-  const [step, setStep] = useState<Step>("phone")
-  const [phone, setPhone] = useState("")
-  const [otp, setOtp] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState("")
+  const router = useRouter();
+  const [step, setStep] = useState<Step>("phone");
+  const [phone, setPhone] = useState("");
+  const [otp, setOtp] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session) {
+        router.replace("/");
+      }
+    };
+
+    checkUser();
+  }, [router]);
 
   const handleSendOTP = async () => {
     if (phone.length !== 10) {
-      setError("Please enter a valid 10-digit mobile number")
-      return
+      setError("Please enter a valid 10-digit mobile number");
+      return;
     }
 
-    setError("")
-    setIsLoading(true)
+    setError("");
+    setIsLoading(true);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        phone: "+91" + phone,
+      });
 
-    setIsLoading(false)
-    setStep("otp")
-  }
+      if (error) {
+        setError(error.message);
+        return;
+      }
+
+      setStep("otp");
+    } catch (err) {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleVerifyOTP = async () => {
     if (otp.length !== 6) {
-      setError("Please enter the complete OTP")
-      return
+      setError("Please enter the complete OTP");
+      return;
     }
 
-    setError("")
-    setIsLoading(true)
+    setError("");
+    setIsLoading(true);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        phone: "+91" + phone,
+        token: otp,
+        type: "sms",
+      });
 
-    setIsLoading(false)
-    setStep("success")
-
-    // Redirect after success animation
-    setTimeout(() => {
-      // Check if user is new (simulate with localStorage)
-      const isNewUser = !localStorage.getItem("mysaadi_profile_complete")
-      if (isNewUser) {
-        router.push("/onboarding")
-      } else {
-        router.push("/dashboard")
+      if (error) {
+        setError(error.message);
+        setIsLoading(false);
+        return;
       }
-    }, 2000)
-  }
+
+      setStep("success");
+
+      // Redirect after success animation
+      setTimeout(async () => {
+        if (!data.session?.user) {
+          router.push("/login");
+          return;
+        }
+
+        try {
+          // Check if profile exists
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", data.session.user.id)
+            .single();
+
+          if (!profile) {
+            // Create new profile
+            const { error: insertError } = await supabase
+              .from("profiles")
+              .insert({
+                id: data.session.user.id,
+                phone: data.session.user.phone,
+              });
+
+            if (insertError) {
+              console.error("Error creating profile:", insertError);
+            }
+            router.push("/onboarding");
+          } else {
+            // Profile exists, check if complete
+            if (profile.is_complete) {
+              router.push("/dashboard");
+            } else {
+              router.push("/onboarding");
+            }
+          }
+        } catch (error) {
+          console.error("Error checking profile:", error);
+          router.push("/onboarding");
+        }
+      }, 2000);
+    } catch (err) {
+      setError("Something went wrong. Please try again.");
+      setIsLoading(false);
+    }
+  };
 
   const handleResendOTP = async () => {
-    setIsLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setIsLoading(false)
-    setOtp("")
-  }
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        phone: "+91" + phone,
+      });
+
+      if (error) {
+        setError(error.message);
+      } else {
+        setOtp("");
+      }
+    } catch (err) {
+      setError("Failed to resend OTP");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -76,7 +170,9 @@ export function LoginForm() {
       <div
         className={cn(
           "transition-all duration-500 ease-in-out",
-          step === "phone" ? "opacity-100 translate-x-0" : "opacity-0 translate-x-[-100%] absolute pointer-events-none",
+          step === "phone"
+            ? "opacity-100 translate-x-0"
+            : "opacity-0 translate-x-[-100%] absolute pointer-events-none",
         )}
       >
         {step === "phone" && (
@@ -94,9 +190,11 @@ export function LoginForm() {
                   placeholder="Enter your mobile number"
                   value={phone}
                   onChange={(e) => {
-                    const value = e.target.value.replace(/\D/g, "").slice(0, 10)
-                    setPhone(value)
-                    setError("")
+                    const value = e.target.value
+                      .replace(/\D/g, "")
+                      .slice(0, 10);
+                    setPhone(value);
+                    setError("");
                   }}
                   className="pl-20 h-12"
                 />
@@ -104,7 +202,12 @@ export function LoginForm() {
               {error && <p className="text-sm text-destructive">{error}</p>}
             </div>
 
-            <Button onClick={handleSendOTP} disabled={isLoading} className="w-full h-12 rounded-full" size="lg">
+            <Button
+              onClick={handleSendOTP}
+              disabled={isLoading}
+              className="w-full h-12 rounded-full"
+              size="lg"
+            >
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -125,15 +228,17 @@ export function LoginForm() {
       <div
         className={cn(
           "transition-all duration-500 ease-in-out",
-          step === "otp" ? "opacity-100 translate-x-0" : "opacity-0 translate-x-[100%] absolute pointer-events-none",
+          step === "otp"
+            ? "opacity-100 translate-x-0"
+            : "opacity-0 translate-x-[100%] absolute pointer-events-none",
         )}
       >
         {step === "otp" && (
           <div className="space-y-6">
             <button
               onClick={() => {
-                setStep("phone")
-                setOtp("")
+                setStep("phone");
+                setOtp("");
               }}
               className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
@@ -144,14 +249,19 @@ export function LoginForm() {
             <Card className="bg-secondary/50">
               <CardContent className="p-4">
                 <p className="text-sm">
-                  We&apos;ve sent a 6-digit OTP to <span className="font-semibold">+91 {phone}</span>
+                  We&apos;ve sent a 6-digit OTP to{" "}
+                  <span className="font-semibold">+91 {phone}</span>
                 </p>
               </CardContent>
             </Card>
 
             <div className="space-y-2">
               <Label>Enter OTP</Label>
-              <InputOTP maxLength={6} value={otp} onChange={(value) => setOtp(value)}>
+              <InputOTP
+                maxLength={6}
+                value={otp}
+                onChange={(value) => setOtp(value)}
+              >
                 <InputOTPGroup className="gap-2 w-full justify-center">
                   <InputOTPSlot index={0} className="w-12 h-12 text-lg" />
                   <InputOTPSlot index={1} className="w-12 h-12 text-lg" />
@@ -161,10 +271,17 @@ export function LoginForm() {
                   <InputOTPSlot index={5} className="w-12 h-12 text-lg" />
                 </InputOTPGroup>
               </InputOTP>
-              {error && <p className="text-sm text-destructive text-center">{error}</p>}
+              {error && (
+                <p className="text-sm text-destructive text-center">{error}</p>
+              )}
             </div>
 
-            <Button onClick={handleVerifyOTP} disabled={isLoading} className="w-full h-12 rounded-full" size="lg">
+            <Button
+              onClick={handleVerifyOTP}
+              disabled={isLoading}
+              className="w-full h-12 rounded-full"
+              size="lg"
+            >
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -192,7 +309,9 @@ export function LoginForm() {
       <div
         className={cn(
           "transition-all duration-500 ease-in-out",
-          step === "success" ? "opacity-100 scale-100" : "opacity-0 scale-95 absolute pointer-events-none",
+          step === "success"
+            ? "opacity-100 scale-100"
+            : "opacity-0 scale-95 absolute pointer-events-none",
         )}
       >
         {step === "success" && (
@@ -204,13 +323,17 @@ export function LoginForm() {
               <Sparkles className="absolute -top-2 -right-2 h-6 w-6 text-primary animate-pulse" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold mb-2">Welcome to MySaadi!</h2>
-              <p className="text-muted-foreground">Taking you to your dashboard...</p>
+              <h2 className="text-xl font-semibold mb-2">
+                Welcome to MySaadi!
+              </h2>
+              <p className="text-muted-foreground">
+                Taking you to your dashboard...
+              </p>
             </div>
             <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
           </div>
         )}
       </div>
     </div>
-  )
+  );
 }

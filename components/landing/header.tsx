@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Heart, Menu } from "lucide-react";
+import { Heart, Menu, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 
 // const navLinks = [
 //   { href: "#how-it-works", label: "How It Works" },
@@ -15,8 +17,23 @@ import { cn } from "@/lib/utils";
 // ]
 
 export function Header() {
+  const router = useRouter();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      setIsLoggedIn(!!session);
+      setIsLoading(false);
+    };
+
+    checkAuth();
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -25,6 +42,12 @@ export function Header() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setIsLoggedIn(false);
+    router.push("/");
+  };
 
   return (
     <header
@@ -67,9 +90,21 @@ export function Header() {
             {/* <Button variant="ghost" asChild>
               <Link href="/login">Log in</Link>
             </Button> */}
-            <Button asChild className="rounded-full px-6">
-              <Link href="/login">Get Started</Link>
-            </Button>
+            {!isLoading &&
+              (isLoggedIn ? (
+                <Button
+                  onClick={handleLogout}
+                  variant="outline"
+                  className="rounded-full px-6"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Logout
+                </Button>
+              ) : (
+                <Button asChild className="rounded-full px-6">
+                  <Link href="/login">Get Started</Link>
+                </Button>
+              ))}
           </div>
 
           {/* Mobile Menu */}
@@ -112,9 +147,24 @@ export function Header() {
                   >
                     <Link href="/login">Log in</Link>
                   </Button> */}
-                  <Button asChild className="w-full rounded-full">
-                    <Link href="/login">Get Started</Link>
-                  </Button>
+                  {!isLoading &&
+                    (isLoggedIn ? (
+                      <Button
+                        onClick={() => {
+                          handleLogout();
+                          setIsOpen(false);
+                        }}
+                        variant="outline"
+                        className="w-full rounded-full"
+                      >
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Logout
+                      </Button>
+                    ) : (
+                      <Button asChild className="w-full rounded-full">
+                        <Link href="/login">Get Started</Link>
+                      </Button>
+                    ))}
                 </div>
               </div>
             </SheetContent>
