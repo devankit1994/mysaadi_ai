@@ -18,8 +18,11 @@ export default function LoginPage() {
           </Link>
 
           <h1 className="text-2xl font-bold mb-2">Welcome Back</h1>
-          <p className="text-muted-foreground mb-8">
+          {/* <p className="text-muted-foreground mb-8">
             Sign in with your mobile number to continue
+          </p> */}
+          <p className="text-muted-foreground mb-8">
+            Sign in with your google account to continue
           </p>
 
           <LoginForm />
