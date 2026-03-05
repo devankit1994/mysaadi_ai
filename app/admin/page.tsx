@@ -27,64 +27,23 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Heart,
   Users,
-  CreditCard,
   Search,
-  MoreHorizontal,
-  Eye,
-  Ban,
   CheckCircle,
   Shield,
-  UserCheck,
+  UserPlus,
   Calendar,
-  IndianRupee,
-  ArrowUp,
-  ArrowDown,
   Download,
-  Filter,
-  RefreshCw,
   Loader2,
   LogOut,
   AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-
-const stats = [
-  {
-    label: "Total Users",
-    value: "52,847",
-    change: "+12%",
-    trend: "up",
-    icon: Users,
-  },
-  {
-    label: "Active Today",
-    value: "8,392",
-    change: "+8%",
-    trend: "up",
-    icon: UserCheck,
-  },
-  {
-    label: "Revenue (Month)",
-    value: "₹4,82,350",
-    change: "+23%",
-    trend: "up",
-    icon: IndianRupee,
-  },
-  {
-    label: "Profile Unlocks",
-    value: "12,456",
-    change: "+5%",
-    trend: "up",
-    icon: CreditCard,
-  },
-];
 
 const recentUsers = [
   {
@@ -204,9 +163,21 @@ export default function AdminPage() {
   const [authError, setAuthError] = useState("");
   const [isAuthLoading, setIsAuthLoading] = useState(false);
 
+  // Users state
+  const [users, setUsers] = useState<typeof recentUsers>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+
+  // Create user moved to /admin/users/new
+
   useEffect(() => {
     checkSession();
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchUsers();
+    }
+  }, [isAuthenticated]);
 
   const checkSession = async () => {
     try {
@@ -231,6 +202,75 @@ export default function AdminPage() {
       console.error("Session check failed", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      setUsersLoading(true);
+      const { data: profiles, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+
+      // Fetch email data for all profiles using RPC or direct auth query
+      const userIds = (profiles || []).map((p: any) => p.id);
+      const { data: emailData } = await supabase.rpc("get_user_emails", {
+        user_ids: userIds,
+      });
+
+      const emailMap = (emailData || []).reduce((acc: any, item: any) => {
+        acc[item.id] = item.email;
+        return acc;
+      }, {});
+
+      const transformedUsers = (profiles || []).map((profile: any) => {
+        // Calculate profile completion percentage
+        const fields = [
+          profile.first_name,
+          profile.last_name,
+          profile.phone,
+          profile.city,
+          profile.gender,
+          profile.education,
+          profile.profession,
+          profile.bio,
+          profile.photos?.length,
+        ];
+        const filledFields = fields.filter((f) => f).length;
+        const profileComplete = Math.round(
+          (filledFields / fields.length) * 100,
+        );
+
+        return {
+          id: profile.id,
+          name:
+            `${profile.first_name || ""} ${profile.last_name || ""}`.trim() ||
+            "Unknown User",
+          email: emailMap[profile.id] || "N/A",
+          phone: profile.phone || "N/A",
+          city: profile.city || "Not specified",
+          joinDate: new Date(profile.created_at).toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+          }),
+          status: profile.is_complete ? "active" : "pending",
+          verified: profile.is_complete || false,
+          image: profile.photos?.[0] || "/placeholder.svg",
+          profileComplete,
+        };
+      });
+
+      setUsers(transformedUsers);
+    } catch (error) {
+      console.error("Failed to fetch users:", error);
+      toast.error("Failed to load users");
+    } finally {
+      setUsersLoading(false);
     }
   };
 
@@ -262,7 +302,7 @@ export default function AdminPage() {
       const { error: signInError } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          shouldCreateUser: false, // Only allow existing users (or rely on whitelist check above)
+          shouldCreateUser: true,
         },
       });
 
@@ -441,15 +481,6 @@ export default function AdminPage() {
             <Badge variant="secondary">Admin Panel</Badge>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" className="bg-transparent">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
-            <Button variant="outline" size="sm" className="bg-transparent">
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -477,47 +508,11 @@ export default function AdminPage() {
       </header>
 
       <main className="container mx-auto px-4 py-6 space-y-6">
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {stats.map((stat, index) => (
-            <Card key={index}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <stat.icon className="h-5 w-5 text-muted-foreground" />
-                  <Badge
-                    variant="secondary"
-                    className={
-                      stat.trend === "up" ? "text-green-600" : "text-red-600"
-                    }
-                  >
-                    {stat.trend === "up" ? (
-                      <ArrowUp className="h-3 w-3 mr-1" />
-                    ) : (
-                      <ArrowDown className="h-3 w-3 mr-1" />
-                    )}
-                    {stat.change}
-                  </Badge>
-                </div>
-                <p className="text-2xl font-bold">{stat.value}</p>
-                <p className="text-sm text-muted-foreground">{stat.label}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
         <Tabs defaultValue="users" className="space-y-6">
           <TabsList>
             <TabsTrigger value="users">
               <Users className="h-4 w-4 mr-2" />
               Users
-            </TabsTrigger>
-            <TabsTrigger value="payments">
-              <CreditCard className="h-4 w-4 mr-2" />
-              Payments
-            </TabsTrigger>
-            <TabsTrigger value="moderation">
-              <Shield className="h-4 w-4 mr-2" />
-              Moderation
             </TabsTrigger>
           </TabsList>
 
@@ -542,12 +537,11 @@ export default function AdminPage() {
                         className="pl-10 w-64"
                       />
                     </div>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="bg-transparent"
-                    >
-                      <Filter className="h-4 w-4" />
+                    <Button asChild>
+                      <Link href="/admin/users/new">
+                        <UserPlus className="h-4 w-4 mr-2" />
+                        Add User
+                      </Link>
                     </Button>
                   </div>
                 </div>
@@ -557,95 +551,82 @@ export default function AdminPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>User</TableHead>
-                      <TableHead>Contact</TableHead>
                       <TableHead>City</TableHead>
                       <TableHead>Joined</TableHead>
                       <TableHead>Profile</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {recentUsers.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <Avatar>
-                              <AvatarImage
-                                src={user.image || "/placeholder.svg"}
-                              />
-                              <AvatarFallback>{user.name[0]}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="font-medium flex items-center gap-2">
-                                {user.name}
-                                {user.verified && (
-                                  <CheckCircle className="h-4 w-4 text-green-500" />
-                                )}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {user.email}
-                              </p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm">{user.phone}</TableCell>
-                        <TableCell>{user.city}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {user.joinDate}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div className="w-16 h-2 rounded-full bg-secondary overflow-hidden">
-                              <div
-                                className="h-full bg-primary"
-                                style={{ width: `${user.profileComplete}%` }}
-                              />
-                            </div>
-                            <span className="text-sm">
-                              {user.profileComplete}%
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={
-                              user.status === "active"
-                                ? "default"
-                                : user.status === "pending"
-                                  ? "secondary"
-                                  : "destructive"
-                            }
-                          >
-                            {user.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem>
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Profile
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <CheckCircle className="h-4 w-4 mr-2" />
-                                Verify User
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-destructive">
-                                <Ban className="h-4 w-4 mr-2" />
-                                Suspend User
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                    {usersLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8">
+                          <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : users.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={7}
+                          className="text-center py-8 text-muted-foreground"
+                        >
+                          No users found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      users.map((user) => (
+                        <TableRow key={user.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <Avatar>
+                                <AvatarImage
+                                  src={user.image || "/placeholder.svg"}
+                                />
+                                <AvatarFallback>{user.name[0]}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="font-medium flex items-center gap-2">
+                                  {user.name}
+                                  {user.verified && (
+                                    <CheckCircle className="h-4 w-4 text-green-500" />
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>{user.city}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {user.joinDate}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="w-16 h-2 rounded-full bg-secondary overflow-hidden">
+                                <div
+                                  className="h-full bg-primary"
+                                  style={{ width: `${user.profileComplete}%` }}
+                                />
+                              </div>
+                              <span className="text-sm">
+                                {user.profileComplete}%
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                user.status === "active"
+                                  ? "default"
+                                  : user.status === "pending"
+                                    ? "secondary"
+                                    : "destructive"
+                              }
+                            >
+                              {user.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </CardContent>

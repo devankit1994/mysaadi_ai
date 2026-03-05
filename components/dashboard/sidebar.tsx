@@ -37,10 +37,8 @@ const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
   { icon: User, label: "My Profile", href: "/dashboard/profile" },
   { icon: Users, label: "Explore Matches", href: "/explore", badge: "New" },
-  { icon: Bookmark, label: "Saved Profiles", href: "/dashboard/saved" },
-  { icon: Send, label: "Requests", href: "/dashboard/requests", badge: "3" },
-  { icon: CreditCard, label: "Payments", href: "/dashboard/payments" },
-  { icon: Settings, label: "Settings", href: "/dashboard/settings" },
+  // { icon: Bookmark, label: "Saved Profiles", href: "/dashboard/saved" },
+  // { icon: CreditCard, label: "Payments", href: "/dashboard/payments" },
 ];
 
 export function DashboardSidebar() {
@@ -202,45 +200,7 @@ export function DashboardSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
-        {/* Unlock Credits */}
-        <SidebarGroup>
-          <SidebarGroupContent className="p-4">
-            <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 to-accent/10 border border-primary/20">
-              <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="h-5 w-5 text-primary" />
-                <span className="font-semibold">Unlock Balance</span>
-              </div>
-              <p className="text-2xl font-bold text-primary">₹0</p>
-              <p className="text-xs text-muted-foreground mb-3">
-                Add credits to unlock profiles
-              </p>
-              <Link
-                href="/dashboard/payments"
-                className="block w-full text-center py-2 px-4 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
-              >
-                Add Credits
-              </Link>
-            </div>
-          </SidebarGroupContent>
-        </SidebarGroup>
       </SidebarContent>
-
-      <SidebarFooter className="p-4 border-t border-sidebar-border">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Link
-                href="/login"
-                className="text-destructive hover:text-destructive"
-              >
-                <LogOut className="h-5 w-5" />
-                <span>Log Out</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
     </Sidebar>
   );
 }

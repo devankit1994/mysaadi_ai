@@ -2,33 +2,18 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight, Sparkles, Heart, Shield, Users } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 export function HeroSection() {
   const [mounted, setMounted] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const { isLoggedIn } = useAuth();
 
   useEffect(() => {
     setMounted(true);
-    const checkAuth = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      setIsLoggedIn(!!session);
-    };
-    checkAuth();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsLoggedIn(!!session);
-    });
-
-    return () => subscription.unsubscribe();
   }, []);
 
   return (
@@ -93,7 +78,7 @@ export function HeroSection() {
                 className="rounded-full px-8 h-14 text-lg group"
               >
                 <Link href={isLoggedIn ? "/dashboard" : "/login"}>
-                  Get Started Free
+                  {isLoggedIn ? "Go To Dashboard" : "Get Started Free"}
                   <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
                 </Link>
               </Button>

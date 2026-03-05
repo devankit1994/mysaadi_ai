@@ -14,6 +14,10 @@ create table if not exists profiles (
 -- Add new columns if they don't exist (idempotent)
 alter table profiles add column if not exists city text;
 alter table profiles add column if not exists state text;
+alter table profiles add column if not exists religion text;
+alter table profiles add column if not exists mother_tongue text;
+alter table profiles add column if not exists height text;
+alter table profiles add column if not exists marital_status text;
 alter table profiles add column if not exists looking_for text;
 alter table profiles add column if not exists age_range_min integer;
 alter table profiles add column if not exists age_range_max integer;

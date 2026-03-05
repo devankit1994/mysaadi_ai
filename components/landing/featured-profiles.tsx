@@ -16,7 +16,7 @@ import {
   Lock,
   Verified,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/use-auth";
 
 const profiles = [
   {
@@ -89,28 +89,7 @@ const profiles = [
 
 export function FeaturedProfiles() {
   const [scrollPosition, setScrollPosition] = useState(0);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      setIsAuthenticated(!!session);
-      setIsLoading(false);
-    };
-
-    checkAuth();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAuthenticated(!!session);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+  const { isLoggedIn, isLoading } = useAuth();
 
   const scroll = (direction: "left" | "right") => {
     const container = document.getElementById("profiles-container");
@@ -125,7 +104,7 @@ export function FeaturedProfiles() {
     }
   };
 
-  if (isLoading || !isAuthenticated) {
+  if (isLoading || !isLoggedIn) {
     return null;
   }
 

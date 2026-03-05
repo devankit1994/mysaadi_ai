@@ -1,7 +1,15 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+"use client";
+
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Heart,
   Eye,
@@ -15,95 +23,342 @@ import {
   Briefcase,
   ChevronRight,
   Star,
-} from "lucide-react"
-import Link from "next/link"
-import Image from "next/image"
+} from "lucide-react";
+import Link from "next/link";
+import Image from "next/image";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/use-auth";
 
-const stats = [
-  { icon: Eye, label: "Profile Views", value: "128", change: "+12%", color: "text-blue-500" },
-  { icon: Heart, label: "Interests Received", value: "24", change: "+8%", color: "text-primary" },
-  { icon: Send, label: "Interests Sent", value: "15", change: "+5%", color: "text-green-500" },
-  { icon: Users, label: "Matches", value: "8", change: "+2", color: "text-amber-500" },
-]
+type DashboardStat = {
+  icon: any;
+  label: string;
+  value: string;
+  change: string;
+  color: string;
+};
 
-const matchSuggestions = [
-  {
-    id: 1,
-    name: "Rahul",
-    age: 28,
-    city: "Delhi",
-    profession: "Product Manager",
-    compatibility: 95,
-    image: "/handsome-indian-man-professional-portrait-smiling.jpg",
-    verified: true,
-  },
-  {
-    id: 2,
-    name: "Arjun",
-    age: 29,
-    city: "Bangalore",
-    profession: "Data Scientist",
-    compatibility: 92,
-    image: "/indian-man-tech-professional-portrait.jpg",
-    verified: true,
-  },
-  {
-    id: 3,
-    name: "Vikram",
-    age: 30,
-    city: "Mumbai",
-    profession: "Entrepreneur",
-    compatibility: 88,
-    image: "/indian-man-entrepreneur-professional-portrait.jpg",
-    verified: true,
-  },
-]
+type MatchSuggestion = {
+  id: string;
+  name: string;
+  age: number | null;
+  city: string | null;
+  profession: string | null;
+  compatibility: number;
+  image: string | null;
+  verified: boolean;
+};
 
-const recentViews = [
-  {
-    id: 1,
-    name: "Sneha",
-    age: 27,
-    city: "Pune",
-    image: "/indian-woman-marketing-professional-portrait-smili.jpg",
-    time: "2h ago",
-  },
-  {
-    id: 2,
-    name: "Ananya",
-    age: 25,
-    city: "Chennai",
-    image: "/indian-woman-creative-professional-portrait.jpg",
-    time: "5h ago",
-  },
-  {
-    id: 3,
-    name: "Priya M.",
-    age: 26,
-    city: "Hyderabad",
-    image: "/indian-woman-professional-portrait-smiling.jpg",
-    time: "1d ago",
-  },
-]
+type RecentView = {
+  id: string;
+  profileId: string | null;
+  name: string;
+  age: number | null;
+  city: string | null;
+  image: string | null;
+  time: string;
+};
 
-const pendingActions = [
-  {
-    type: "Complete Profile",
-    description: "Add more photos to increase visibility",
-    icon: Sparkles,
-    action: "Complete",
-  },
-  { type: "Verify Phone", description: "Verify your phone number for trust badge", icon: Star, action: "Verify" },
-]
+type PendingAction = {
+  type: string;
+  description: string;
+  icon: any;
+  action: string;
+};
+
+function formatPercentChange(current: number, previous: number) {
+  if (previous <= 0) {
+    if (current <= 0) return "0%";
+    return "+100%";
+  }
+  const pct = Math.round(((current - previous) / previous) * 100);
+  return `${pct >= 0 ? "+" : ""}${pct}%`;
+}
+
+function timeAgo(iso: string) {
+  const then = new Date(iso).getTime();
+  const now = Date.now();
+  const diff = Math.max(0, now - then);
+  const minutes = Math.round(diff / 60000);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  return `${days}d ago`;
+}
 
 export default function DashboardPage() {
+  const { user } = useAuth();
+
+  const [loading, setLoading] = useState(true);
+  const [firstName, setFirstName] = useState<string>("");
+  const [stats, setStats] = useState<DashboardStat[]>([]);
+  const [matchSuggestions, setMatchSuggestions] = useState<MatchSuggestion[]>(
+    [],
+  );
+  const [recentViews, setRecentViews] = useState<RecentView[]>([]);
+  const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
+
+  const welcomeName = useMemo(() => {
+    if (firstName) return firstName;
+    const fromMeta =
+      (user?.user_metadata?.first_name as string | undefined) ||
+      (user?.user_metadata?.full_name as string | undefined) ||
+      (user?.user_metadata?.name as string | undefined) ||
+      "";
+    if (fromMeta) return fromMeta.split(" ").filter(Boolean)[0] || fromMeta;
+    return "";
+  }, [firstName, user?.user_metadata]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function load() {
+      try {
+        if (!user?.id) {
+          if (!active) return;
+          setFirstName("");
+          setStats([]);
+          setMatchSuggestions([]);
+          setRecentViews([]);
+          setPendingActions([]);
+          return;
+        }
+
+        // Fetch current user's profile (for greeting + pending actions)
+        const { data: myProfile } = await supabase
+          .from("profiles")
+          .select(
+            "id, first_name, last_name, is_complete, phone, photos, preferred_city, looking_for, interests",
+          )
+          .eq("id", user.id)
+          .single();
+
+        if (!active) return;
+        setFirstName(myProfile?.first_name || "");
+
+        // Stats: compare last 7 days vs previous 7 days
+        const now = new Date();
+        const last7 = new Date(now);
+        last7.setDate(now.getDate() - 7);
+        const prev14 = new Date(now);
+        prev14.setDate(now.getDate() - 14);
+
+        const [
+          viewsLast7,
+          viewsPrev7,
+          receivedLast7,
+          receivedPrev7,
+          sentLast7,
+          sentPrev7,
+          matchesLast7,
+          matchesPrev7,
+        ] = await Promise.all([
+          supabase
+            .from("profile_views")
+            .select("id", { count: "exact", head: true })
+            .eq("viewed_id", user.id)
+            .gte("created_at", last7.toISOString()),
+          supabase
+            .from("profile_views")
+            .select("id", { count: "exact", head: true })
+            .eq("viewed_id", user.id)
+            .gte("created_at", prev14.toISOString())
+            .lt("created_at", last7.toISOString()),
+          supabase
+            .from("interests")
+            .select("id", { count: "exact", head: true })
+            .eq("to_user", user.id)
+            .eq("status", "pending")
+            .gte("created_at", last7.toISOString()),
+          supabase
+            .from("interests")
+            .select("id", { count: "exact", head: true })
+            .eq("to_user", user.id)
+            .eq("status", "pending")
+            .gte("created_at", prev14.toISOString())
+            .lt("created_at", last7.toISOString()),
+          supabase
+            .from("interests")
+            .select("id", { count: "exact", head: true })
+            .eq("from_user", user.id)
+            .eq("status", "pending")
+            .gte("created_at", last7.toISOString()),
+          supabase
+            .from("interests")
+            .select("id", { count: "exact", head: true })
+            .eq("from_user", user.id)
+            .eq("status", "pending")
+            .gte("created_at", prev14.toISOString())
+            .lt("created_at", last7.toISOString()),
+          supabase
+            .from("interests")
+            .select("id", { count: "exact", head: true })
+            .or(`from_user.eq.${user.id},to_user.eq.${user.id}`)
+            .eq("status", "accepted")
+            .gte("responded_at", last7.toISOString()),
+          supabase
+            .from("interests")
+            .select("id", { count: "exact", head: true })
+            .or(`from_user.eq.${user.id},to_user.eq.${user.id}`)
+            .eq("status", "accepted")
+            .gte("responded_at", prev14.toISOString())
+            .lt("responded_at", last7.toISOString()),
+        ]);
+
+        if (!active) return;
+
+        const viewsLast7Count = viewsLast7.count ?? 0;
+        const viewsPrev7Count = viewsPrev7.count ?? 0;
+        const receivedLast7Count = receivedLast7.count ?? 0;
+        const receivedPrev7Count = receivedPrev7.count ?? 0;
+        const sentLast7Count = sentLast7.count ?? 0;
+        const sentPrev7Count = sentPrev7.count ?? 0;
+        const matchesLast7Count = matchesLast7.count ?? 0;
+        const matchesPrev7Count = matchesPrev7.count ?? 0;
+
+        setStats([
+          {
+            icon: Eye,
+            label: "Profile Views",
+            value: String(viewsLast7Count),
+            change: formatPercentChange(viewsLast7Count, viewsPrev7Count),
+            color: "text-blue-500",
+          },
+          {
+            icon: Heart,
+            label: "Interests Received",
+            value: String(receivedLast7Count),
+            change: formatPercentChange(receivedLast7Count, receivedPrev7Count),
+            color: "text-primary",
+          },
+          {
+            icon: Send,
+            label: "Interests Sent",
+            value: String(sentLast7Count),
+            change: formatPercentChange(sentLast7Count, sentPrev7Count),
+            color: "text-green-500",
+          },
+          {
+            icon: Users,
+            label: "Matches",
+            value: String(matchesLast7Count),
+            change: formatPercentChange(matchesLast7Count, matchesPrev7Count),
+            color: "text-amber-500",
+          },
+        ]);
+
+        // Match suggestions via RPC
+        const { data: suggestions } = await supabase.rpc(
+          "get_match_suggestions",
+          { limit_input: 3 },
+        );
+
+        if (!active) return;
+
+        setMatchSuggestions(
+          (suggestions ?? []).map((row: any) => {
+            const name =
+              `${row.first_name || ""} ${row.last_name || ""}`.trim() || "User";
+            return {
+              id: row.id,
+              name,
+              age: typeof row.age === "number" ? row.age : null,
+              city: row.city ?? null,
+              profession: row.profession ?? null,
+              compatibility: Number(row.compatibility ?? 0),
+              image: row.photo ?? null,
+              verified: !!row.verified,
+            } satisfies MatchSuggestion;
+          }),
+        );
+
+        // Recent views (join viewer profile via FK)
+        const { data: views } = await supabase
+          .from("profile_views")
+          .select(
+            "id, created_at, viewer:viewer_id ( id, first_name, last_name, city, date_of_birth, photos )",
+          )
+          .eq("viewed_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(3);
+
+        if (!active) return;
+
+        setRecentViews(
+          (views ?? []).map((v: any) => {
+            const viewer = v.viewer;
+            const name =
+              `${viewer?.first_name || ""} ${viewer?.last_name || ""}`.trim() ||
+              "Someone";
+            const dob = viewer?.date_of_birth
+              ? new Date(viewer.date_of_birth)
+              : null;
+            const age = dob
+              ? Math.max(0, new Date().getFullYear() - dob.getFullYear())
+              : null;
+            const photo = viewer?.photos?.[0] || null;
+            return {
+              id: String(v.id),
+              profileId: viewer?.id ? String(viewer.id) : null,
+              name,
+              age,
+              city: viewer?.city ?? null,
+              image: photo,
+              time: v.created_at ? timeAgo(v.created_at) : "",
+            } satisfies RecentView;
+          }),
+        );
+
+        // Pending actions (derived from profile)
+        const actions: PendingAction[] = [];
+        const photoCount = Array.isArray(myProfile?.photos)
+          ? myProfile.photos.length
+          : 0;
+        if (!myProfile?.is_complete || photoCount < 2) {
+          actions.push({
+            type: "Complete Profile",
+            description: "Add more details/photos to increase visibility",
+            icon: Sparkles,
+            action: "Complete",
+          });
+        }
+
+        if (!myProfile?.phone) {
+          actions.push({
+            type: "Verify Phone",
+            description: "Verify your phone number for trust badge",
+            icon: Star,
+            action: "Verify",
+          });
+        }
+
+        setPendingActions(actions);
+      } finally {
+        if (!active) return;
+        setLoading(false);
+      }
+    }
+
+    setLoading(true);
+    load();
+
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
+
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Welcome back, Priya!</h1>
-          <p className="text-muted-foreground">Here&apos;s what&apos;s happening with your profile today.</p>
+          <h1 className="text-2xl md:text-3xl font-bold">
+            Welcome back{welcomeName ? `, ${welcomeName}` : ""}!
+          </h1>
+          <p className="text-muted-foreground">
+            Here&apos;s what&apos;s happening with your profile today.
+          </p>
         </div>
         <Button asChild className="rounded-full">
           <Link href="/explore">
@@ -115,7 +370,39 @@ export default function DashboardPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, index) => (
+        {(loading
+          ? [
+              {
+                icon: Eye,
+                label: "Profile Views",
+                value: "…",
+                change: "…",
+                color: "text-blue-500",
+              },
+              {
+                icon: Heart,
+                label: "Interests Received",
+                value: "…",
+                change: "…",
+                color: "text-primary",
+              },
+              {
+                icon: Send,
+                label: "Interests Sent",
+                value: "…",
+                change: "…",
+                color: "text-green-500",
+              },
+              {
+                icon: Users,
+                label: "Matches",
+                value: "…",
+                change: "…",
+                color: "text-amber-500",
+              },
+            ]
+          : stats
+        ).map((stat, index) => (
           <Card key={index} className="hover:shadow-md transition-shadow">
             <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between mb-2">
@@ -132,7 +419,7 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid lg:grid-cols-1 gap-6">
         {/* Match Suggestions */}
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
@@ -151,8 +438,8 @@ export default function DashboardPage() {
             </Button>
           </CardHeader>
           <CardContent>
-            <div className="grid md:grid-cols-3 gap-4">
-              {matchSuggestions.map((match) => (
+            <div className="grid md:grid-cols-6 gap-4">
+              {(loading ? [] : matchSuggestions).map((match) => (
                 <Link
                   key={match.id}
                   href={`/profile/${match.id}`}
@@ -169,95 +456,39 @@ export default function DashboardPage() {
 
                     {/* Compatibility badge */}
                     <div className="absolute top-3 right-3">
-                      <Badge className="bg-primary/90 hover:bg-primary">{match.compatibility}% Match</Badge>
+                      <Badge className="bg-primary/90 hover:bg-primary">
+                        {match.compatibility}% Match
+                      </Badge>
                     </div>
 
                     {/* Info */}
                     <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
                       <h3 className="font-semibold text-lg">
-                        {match.name}, {match.age}
+                        {match.name}
+                        {typeof match.age === "number" ? `, ${match.age}` : ""}
                       </h3>
                       <div className="flex items-center gap-2 text-sm text-white/80">
                         <MapPin className="h-3 w-3" />
-                        <span>{match.city}</span>
+                        <span>{match.city || "—"}</span>
                       </div>
                       <div className="flex items-center gap-2 text-sm text-white/80">
                         <Briefcase className="h-3 w-3" />
-                        <span>{match.profession}</span>
+                        <span>{match.profession || "—"}</span>
                       </div>
                     </div>
                   </div>
                 </Link>
               ))}
+
+              {!loading && matchSuggestions.length === 0 ? (
+                <div className="md:col-span-3 text-sm text-muted-foreground">
+                  No suggestions yet.
+                </div>
+              ) : null}
             </div>
           </CardContent>
         </Card>
-
-        {/* Recent Profile Views */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Eye className="h-5 w-5 text-blue-500" />
-              Who Viewed You
-            </CardTitle>
-            <CardDescription>People who checked your profile</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {recentViews.map((view) => (
-              <Link
-                key={view.id}
-                href={`/profile/${view.id}`}
-                className="flex items-center gap-3 p-2 rounded-lg hover:bg-secondary/50 transition-colors"
-              >
-                <Avatar>
-                  <AvatarImage src={view.image || "/placeholder.svg"} />
-                  <AvatarFallback>{view.name[0]}</AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">
-                    {view.name}, {view.age}
-                  </p>
-                  <p className="text-sm text-muted-foreground">{view.city}</p>
-                </div>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  {view.time}
-                </div>
-              </Link>
-            ))}
-            <Button variant="outline" className="w-full bg-transparent" asChild>
-              <Link href="/dashboard/views">View All</Link>
-            </Button>
-          </CardContent>
-        </Card>
       </div>
-
-      {/* Pending Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Complete Your Profile</CardTitle>
-          <CardDescription>Take these actions to improve your match rate</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-2 gap-4">
-            {pendingActions.map((action, index) => (
-              <div
-                key={index}
-                className="flex items-center gap-4 p-4 rounded-xl border border-border hover:border-primary/50 transition-colors"
-              >
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                  <action.icon className="h-6 w-6 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium">{action.type}</p>
-                  <p className="text-sm text-muted-foreground">{action.description}</p>
-                </div>
-                <Button size="sm">{action.action}</Button>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* CTA Banner */}
       <Card className="bg-gradient-to-r from-primary/10 to-accent/10 border-primary/20">
@@ -269,7 +500,9 @@ export default function DashboardPage() {
               </div>
               <div>
                 <h3 className="text-xl font-semibold">Ready to Connect?</h3>
-                <p className="text-muted-foreground">Unlock profiles for just ₹39 and start chatting!</p>
+                <p className="text-muted-foreground">
+                  Unlock profiles for just ₹39 and start chatting!
+                </p>
               </div>
             </div>
             <Button size="lg" className="rounded-full" asChild>
@@ -282,5 +515,5 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

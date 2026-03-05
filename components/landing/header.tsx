@@ -8,6 +8,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Heart, Menu, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/use-auth";
 
 // const navLinks = [
 //   { href: "#how-it-works", label: "How It Works" },
@@ -20,20 +21,7 @@ export function Header() {
   const router = useRouter();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      setIsLoggedIn(!!session);
-      setIsLoading(false);
-    };
-
-    checkAuth();
-  }, []);
+  const { isLoggedIn, isLoading } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -45,7 +33,6 @@ export function Header() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    setIsLoggedIn(false);
     router.push("/");
   };
 

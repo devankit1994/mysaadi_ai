@@ -1,13 +1,19 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Image from "next/image"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { useCallback, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Heart,
   MapPin,
@@ -33,8 +39,8 @@ import {
   Sparkles,
   Shield,
   Check,
-} from "lucide-react"
-import { cn } from "@/lib/utils"
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 // Mock profile data
 const profile = {
@@ -76,22 +82,140 @@ const profile = {
   contactLocked: true,
   phone: "+91 98XXX XXXXX",
   whatsapp: "+91 98XXX XXXXX",
-}
+};
 
 export default function ProfilePage() {
-  const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [isUnlockModalOpen, setIsUnlockModalOpen] = useState(false)
-  const [isSaved, setIsSaved] = useState(false)
-  const [isLiked, setIsLiked] = useState(false)
-  const [isUnlocked, setIsUnlocked] = useState(false)
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isUnlockModalOpen, setIsUnlockModalOpen] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
+
+  const loadRazorpay = useCallback((): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if (typeof window === "undefined") return resolve(false);
+      if ((window as any).Razorpay) return resolve(true);
+
+      const existing = document.querySelector(
+        'script[src="https://checkout.razorpay.com/v1/checkout.js"]',
+      );
+      if (existing) {
+        existing.addEventListener("load", () => resolve(true));
+        existing.addEventListener("error", () => resolve(false));
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.async = true;
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  }, []);
+
+  const startUnlockPayment = useCallback(async () => {
+    if (isUnlocked || isPaying) return;
+
+    setIsPaying(true);
+
+    const loaded = await loadRazorpay();
+    if (!loaded) {
+      setIsPaying(false);
+      alert("Razorpay SDK failed to load. Please try again.");
+      return;
+    }
+
+    try {
+      const orderRes = await fetch("/api/razorpay/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileId: profile.id }),
+      });
+
+      if (!orderRes.ok) {
+        const errText = await orderRes.text().catch(() => "");
+        throw new Error(errText || "Failed to create order");
+      }
+
+      const data = (await orderRes.json()) as {
+        keyId: string;
+        orderId: string;
+        amount: number;
+        currency: string;
+      };
+
+      const firstName = profile.name.split(" ")[0] || "Profile";
+
+      const options = {
+        key: data.keyId,
+        amount: data.amount,
+        currency: data.currency,
+        name: "MySaadi",
+        description: `Unlock ${firstName}'s contact details`,
+        order_id: data.orderId,
+        prefill: {
+          name: "",
+          email: "",
+          contact: "",
+        },
+        modal: {
+          ondismiss: () => {
+            setIsPaying(false);
+          },
+        },
+        handler: async (response: any) => {
+          try {
+            const verifyRes = await fetch("/api/razorpay/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(response),
+            });
+
+            if (!verifyRes.ok) {
+              throw new Error("Payment verification failed");
+            }
+
+            setIsUnlocked(true);
+            setIsUnlockModalOpen(false);
+          } catch (e) {
+            console.error(e);
+            alert(
+              "Payment succeeded but verification failed. Please contact support.",
+            );
+          } finally {
+            setIsPaying(false);
+          }
+        },
+        theme: {
+          color: "#7c3aed",
+        },
+      };
+
+      const RazorpayCtor = (window as any).Razorpay;
+      const rzp = new RazorpayCtor(options);
+      rzp.on("payment.failed", (err: any) => {
+        console.error("Razorpay payment failed", err);
+        setIsPaying(false);
+      });
+      rzp.open();
+    } catch (e) {
+      console.error(e);
+      alert("Unable to start payment. Please try again.");
+      setIsPaying(false);
+    }
+  }, [isPaying, isUnlocked, loadRazorpay]);
 
   const nextImage = () => {
-    setCurrentImageIndex((prev) => (prev + 1) % profile.images.length)
-  }
+    setCurrentImageIndex((prev) => (prev + 1) % profile.images.length);
+  };
 
   const prevImage = () => {
-    setCurrentImageIndex((prev) => (prev - 1 + profile.images.length) % profile.images.length)
-  }
+    setCurrentImageIndex(
+      (prev) => (prev - 1 + profile.images.length) % profile.images.length,
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -104,8 +228,17 @@ export default function ProfilePage() {
             </Link>
           </Button>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => setIsSaved(!isSaved)}>
-              <Bookmark className={cn("h-5 w-5", isSaved && "fill-current text-primary")} />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsSaved(!isSaved)}
+            >
+              <Bookmark
+                className={cn(
+                  "h-5 w-5",
+                  isSaved && "fill-current text-primary",
+                )}
+              />
             </Button>
             <Button variant="ghost" size="icon">
               <Share2 className="h-5 w-5" />
@@ -154,7 +287,9 @@ export default function ProfilePage() {
                       onClick={() => setCurrentImageIndex(index)}
                       className={cn(
                         "w-2 h-2 rounded-full transition-all",
-                        index === currentImageIndex ? "w-6 bg-white" : "bg-white/50",
+                        index === currentImageIndex
+                          ? "w-6 bg-white"
+                          : "bg-white/50",
                       )}
                     />
                   ))}
@@ -162,7 +297,9 @@ export default function ProfilePage() {
 
                 {/* Badges */}
                 <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
-                  <Badge className="bg-primary/90">{profile.compatibility}% Match</Badge>
+                  <Badge className="bg-primary/90">
+                    {profile.compatibility}% Match
+                  </Badge>
                   {profile.verified && (
                     <Badge className="bg-green-500/90">
                       <Verified className="h-3 w-3 mr-1" />
@@ -184,7 +321,12 @@ export default function ProfilePage() {
                     index === currentImageIndex && "ring-2 ring-primary",
                   )}
                 >
-                  <Image src={image || "/placeholder.svg"} alt={`Photo ${index + 1}`} fill className="object-cover" />
+                  <Image
+                    src={image || "/placeholder.svg"}
+                    alt={`Photo ${index + 1}`}
+                    fill
+                    className="object-cover"
+                  />
                 </button>
               ))}
             </div>
@@ -200,11 +342,15 @@ export default function ProfilePage() {
               <CardContent>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-3xl font-bold text-primary">{profile.compatibility}%</span>
+                    <span className="text-3xl font-bold text-primary">
+                      {profile.compatibility}%
+                    </span>
                     <Badge variant="secondary">Excellent Match</Badge>
                   </div>
                   <Progress value={profile.compatibility} className="h-3" />
-                  <p className="text-xs text-muted-foreground">Based on your preferences and interests</p>
+                  <p className="text-xs text-muted-foreground">
+                    Based on your preferences and interests
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -213,13 +359,21 @@ export default function ProfilePage() {
             <div className="flex gap-3">
               <Button
                 variant="outline"
-                className={cn("flex-1 bg-transparent", isLiked && "bg-primary/10 border-primary text-primary")}
+                className={cn(
+                  "flex-1 bg-transparent",
+                  isLiked && "bg-primary/10 border-primary text-primary",
+                )}
                 onClick={() => setIsLiked(!isLiked)}
               >
-                <Heart className={cn("h-5 w-5 mr-2", isLiked && "fill-current")} />
+                <Heart
+                  className={cn("h-5 w-5 mr-2", isLiked && "fill-current")}
+                />
                 {isLiked ? "Liked" : "Like"}
               </Button>
-              <Button className="flex-1" onClick={() => setIsUnlockModalOpen(true)}>
+              <Button
+                className="flex-1"
+                onClick={() => setIsUnlockModalOpen(true)}
+              >
                 {isUnlocked ? (
                   <>
                     <Unlock className="h-5 w-5 mr-2" />
@@ -277,7 +431,9 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                <p className="mt-4 text-muted-foreground leading-relaxed">{profile.bio}</p>
+                <p className="mt-4 text-muted-foreground leading-relaxed">
+                  {profile.bio}
+                </p>
               </CardContent>
             </Card>
 
@@ -297,8 +453,12 @@ export default function ProfilePage() {
                     </div>
                     <div>
                       <p className="font-medium">{profile.profession}</p>
-                      <p className="text-sm text-muted-foreground">{profile.company}</p>
-                      <p className="text-sm text-muted-foreground">Income: {profile.income}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {profile.company}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Income: {profile.income}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
@@ -307,7 +467,9 @@ export default function ProfilePage() {
                     </div>
                     <div>
                       <p className="font-medium">{profile.education}</p>
-                      <p className="text-sm text-muted-foreground">{profile.college}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {profile.college}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -330,18 +492,30 @@ export default function ProfilePage() {
                       <span className="font-medium">{profile.familyType}</span>
                     </div>
                     <div className="flex justify-between py-2 border-b border-border">
-                      <span className="text-muted-foreground">Family Status</span>
-                      <span className="font-medium">{profile.familyStatus}</span>
+                      <span className="text-muted-foreground">
+                        Family Status
+                      </span>
+                      <span className="font-medium">
+                        {profile.familyStatus}
+                      </span>
                     </div>
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between py-2 border-b border-border">
-                      <span className="text-muted-foreground">Father&apos;s Occupation</span>
-                      <span className="font-medium">{profile.fatherOccupation}</span>
+                      <span className="text-muted-foreground">
+                        Father&apos;s Occupation
+                      </span>
+                      <span className="font-medium">
+                        {profile.fatherOccupation}
+                      </span>
                     </div>
                     <div className="flex justify-between py-2 border-b border-border">
-                      <span className="text-muted-foreground">Mother&apos;s Occupation</span>
-                      <span className="font-medium">{profile.motherOccupation}</span>
+                      <span className="text-muted-foreground">
+                        Mother&apos;s Occupation
+                      </span>
+                      <span className="font-medium">
+                        {profile.motherOccupation}
+                      </span>
                     </div>
                     <div className="flex justify-between py-2 border-b border-border">
                       <span className="text-muted-foreground">Siblings</span>
@@ -398,7 +572,11 @@ export default function ProfilePage() {
               <CardContent>
                 <div className="flex flex-wrap gap-2">
                   {profile.interests.map((interest) => (
-                    <Badge key={interest} variant="secondary" className="px-4 py-2 text-sm">
+                    <Badge
+                      key={interest}
+                      variant="secondary"
+                      className="px-4 py-2 text-sm"
+                    >
                       {interest}
                     </Badge>
                   ))}
@@ -415,7 +593,9 @@ export default function ProfilePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground leading-relaxed">{profile.lookingFor}</p>
+                <p className="text-muted-foreground leading-relaxed">
+                  {profile.lookingFor}
+                </p>
               </CardContent>
             </Card>
 
@@ -434,9 +614,14 @@ export default function ProfilePage() {
                       <Phone className="h-6 w-6 text-green-600" />
                       <div>
                         <p className="text-sm text-green-600">Phone Number</p>
-                        <p className="font-semibold text-green-700">{profile.phone}</p>
+                        <p className="font-semibold text-green-700">
+                          {profile.phone}
+                        </p>
                       </div>
-                      <Button size="sm" className="ml-auto bg-green-600 hover:bg-green-700">
+                      <Button
+                        size="sm"
+                        className="ml-auto bg-green-600 hover:bg-green-700"
+                      >
                         Call Now
                       </Button>
                     </div>
@@ -444,9 +629,14 @@ export default function ProfilePage() {
                       <MessageCircle className="h-6 w-6 text-green-600" />
                       <div>
                         <p className="text-sm text-green-600">WhatsApp</p>
-                        <p className="font-semibold text-green-700">{profile.whatsapp}</p>
+                        <p className="font-semibold text-green-700">
+                          {profile.whatsapp}
+                        </p>
                       </div>
-                      <Button size="sm" className="ml-auto bg-green-600 hover:bg-green-700">
+                      <Button
+                        size="sm"
+                        className="ml-auto bg-green-600 hover:bg-green-700"
+                      >
                         Message
                       </Button>
                     </div>
@@ -476,13 +666,20 @@ export default function ProfilePage() {
                     {/* Unlock overlay */}
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm rounded-lg">
                       <Lock className="h-12 w-12 text-primary mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">Contact Locked</h3>
+                      <h3 className="text-lg font-semibold mb-2">
+                        Contact Locked
+                      </h3>
                       <p className="text-sm text-muted-foreground mb-4 text-center max-w-xs">
-                        Unlock {profile.name.split(" ")[0]}&apos;s contact details for just ₹39
+                        Unlock {profile.name.split(" ")[0]}&apos;s contact
+                        details for just ₹39
                       </p>
-                      <Button onClick={() => setIsUnlockModalOpen(true)} className="rounded-full">
+                      <Button
+                        onClick={startUnlockPayment}
+                        className="rounded-full"
+                        disabled={isPaying}
+                      >
                         <Unlock className="h-4 w-4 mr-2" />
-                        Unlock Now • ₹39
+                        {isPaying ? "Opening payment..." : "Unlock Now • ₹39"}
                       </Button>
                     </div>
                   </div>
@@ -501,7 +698,9 @@ export default function ProfilePage() {
               <Unlock className="h-5 w-5 text-primary" />
               Unlock {profile.name.split(" ")[0]}&apos;s Profile
             </DialogTitle>
-            <DialogDescription>Get direct access to their contact details</DialogDescription>
+            <DialogDescription>
+              Get direct access to their contact details
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-6 py-4">
@@ -531,21 +730,25 @@ export default function ProfilePage() {
             {/* Security note */}
             <div className="flex items-center gap-2 p-3 rounded-lg bg-secondary/50 text-sm">
               <Shield className="h-5 w-5 text-green-600" />
-              <span className="text-muted-foreground">Secure payment via UPI</span>
+              <span className="text-muted-foreground">
+                Secure payment via UPI
+              </span>
             </div>
 
             {/* Action buttons */}
             <div className="space-y-3">
               <Button
                 className="w-full h-12 rounded-full"
-                onClick={() => {
-                  setIsUnlocked(true)
-                  setIsUnlockModalOpen(false)
-                }}
+                onClick={startUnlockPayment}
+                disabled={isPaying}
               >
-                Pay ₹39 & Unlock
+                {isPaying ? "Opening payment..." : "Pay ₹39 & Unlock"}
               </Button>
-              <Button variant="outline" className="w-full bg-transparent" onClick={() => setIsUnlockModalOpen(false)}>
+              <Button
+                variant="outline"
+                className="w-full bg-transparent"
+                onClick={() => setIsUnlockModalOpen(false)}
+              >
                 Maybe Later
               </Button>
             </div>
@@ -553,5 +756,5 @@ export default function ProfilePage() {
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

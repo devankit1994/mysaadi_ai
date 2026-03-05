@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Card,
   CardContent,
@@ -40,6 +41,7 @@ import {
   Loader2,
   Upload,
   X,
+  AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
@@ -140,42 +142,113 @@ const states = [
   "West Bengal",
 ];
 
-export function ProfileSetupWizard() {
+export type ProfileFormData = {
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+  gender: string;
+  city: string;
+  state: string;
+  lookingFor: string;
+  ageRangeMin: string;
+  ageRangeMax: string;
+  preferredReligion: string;
+  preferredCity: string;
+  photos: string[];
+  education: string;
+  profession: string;
+  income: string;
+  familyType: string;
+  diet: string;
+  drinking: string;
+  smoking: string;
+  bio: string;
+  interests: string[];
+};
+
+type ProfileSetupWizardProps = {
+  /**
+   * Optional override to reuse the wizard UI for non-onboarding flows.
+   * If set, the wizard will call this instead of writing to Supabase + redirecting.
+   */
+  onSubmitProfile?: (data: ProfileFormData) => Promise<void>;
+  /**
+   * Like `onSubmitProfile`, but also provides selected photo Files (in order).
+   * Useful for admin flows where photos must be uploaded server-side.
+   */
+  onSubmitProfileWithFiles?: (
+    data: ProfileFormData,
+    photos: File[],
+  ) => Promise<void>;
+  /** Defaults to true. For admin-created profiles, you likely want false. */
+  allowPhotoUpload?: boolean;
+  /**
+   * If true, the Photos step will allow selecting images but won't upload them
+   * to Supabase Storage. Selected files will be provided via
+   * `onSubmitProfileWithFiles`.
+   */
+  deferPhotoUpload?: boolean;
+  /** Defaults to true. Useful when embedding inside a dialog. */
+  showPreview?: boolean;
+  title?: string;
+  /** Label for the final submit button. Defaults to "Complete Profile". */
+  submitLabel?: string;
+  initialData?: Partial<ProfileFormData>;
+};
+
+const defaultFormData: ProfileFormData = {
+  // Basic Info
+  firstName: "",
+  lastName: "",
+  dateOfBirth: "",
+  gender: "",
+  city: "",
+  state: "",
+  // Preferences
+  lookingFor: "",
+  ageRangeMin: "21",
+  ageRangeMax: "30",
+  preferredReligion: "",
+  preferredCity: "",
+  // Photos
+  photos: [],
+  // Lifestyle
+  education: "",
+  profession: "",
+  income: "",
+  familyType: "",
+  diet: "",
+  drinking: "",
+  smoking: "",
+  // About
+  bio: "",
+  interests: [],
+};
+
+export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
+  const {
+    onSubmitProfile,
+    onSubmitProfileWithFiles,
+    allowPhotoUpload = true,
+    deferPhotoUpload = false,
+    showPreview = true,
+    title = "Complete Your Profile",
+    submitLabel = "Complete Profile",
+    initialData,
+  } = props;
+
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const [pendingPhotos, setPendingPhotos] = useState<Record<string, File>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form data
-  const [formData, setFormData] = useState({
-    // Basic Info
-    firstName: "",
-    lastName: "",
-    dateOfBirth: "",
-    gender: "",
-    city: "",
-    state: "",
-    // Preferences
-    lookingFor: "",
-    ageRangeMin: "21",
-    ageRangeMax: "30",
-    preferredReligion: "",
-    preferredCity: "",
-    // Photos
-    photos: [] as string[],
-    // Lifestyle
-    education: "",
-    profession: "",
-    income: "",
-    familyType: "",
-    diet: "",
-    drinking: "",
-    smoking: "",
-    // About
-    bio: "",
-    interests: [] as string[],
+  const [formData, setFormData] = useState<ProfileFormData>({
+    ...defaultFormData,
+    ...(initialData || {}),
   });
 
   const updateFormData = (field: string, value: string | string[]) => {
@@ -233,7 +306,7 @@ export function ProfileSetupWizard() {
   };
 
   const nextStep = async () => {
-    if (currentStep === 3) {
+    if (currentStep === 3 && allowPhotoUpload && !deferPhotoUpload) {
       // Check if there are any pending photos to upload
       const pendingUrls = Object.keys(pendingPhotos);
       if (pendingUrls.length > 0) {
@@ -302,7 +375,22 @@ export function ProfileSetupWizard() {
 
   const handleSubmit = async () => {
     setIsLoading(true);
+    setSubmitError("");
     try {
+      if (onSubmitProfileWithFiles) {
+        const orderedPhotoFiles = formData.photos
+          .map((url) => pendingPhotos[url])
+          .filter(Boolean) as File[];
+
+        await onSubmitProfileWithFiles(formData, orderedPhotoFiles);
+        return;
+      }
+
+      if (onSubmitProfile) {
+        await onSubmitProfile(formData);
+        return;
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -342,9 +430,9 @@ export function ProfileSetupWizard() {
 
       localStorage.setItem("mysaadi_profile_complete", "true");
       router.push("/dashboard");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating profile:", error);
-      // You might want to add a toast notification here
+      setSubmitError(error?.message || "Failed to save profile");
     } finally {
       setIsLoading(false);
     }
@@ -357,7 +445,7 @@ export function ProfileSetupWizard() {
       {/* Progress Header */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Complete Your Profile</h1>
+          <h1 className="text-2xl font-bold">{title}</h1>
           <span className="text-sm text-muted-foreground">
             Step {currentStep} of {steps.length}
           </span>
@@ -401,21 +489,31 @@ export function ProfileSetupWizard() {
       </div>
 
       {/* Form Content */}
-      <div className="grid lg:grid-cols-3 gap-8">
+      <div className={cn("grid gap-8", showPreview && "lg:grid-cols-3")}>
         {/* Form */}
-        <div className="lg:col-span-2">
+        <div className={cn(showPreview && "lg:col-span-2")}>
           <Card>
             <CardHeader>
               <CardTitle>{steps[currentStep - 1].title}</CardTitle>
               <CardDescription>
                 {currentStep === 1 && "Tell us about yourself"}
                 {currentStep === 2 && "What are you looking for?"}
-                {currentStep === 3 && "Add your best photos"}
+                {currentStep === 3 &&
+                  (allowPhotoUpload
+                    ? "Add your best photos"
+                    : "Photos (disabled in this flow)")}
                 {currentStep === 4 && "Share your lifestyle details"}
                 {currentStep === 5 && "Write about yourself"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {submitError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>{submitError}</AlertDescription>
+                </Alert>
+              )}
               {/* Step 1: Basic Info */}
               {currentStep === 1 && (
                 <>
@@ -646,6 +744,11 @@ export function ProfileSetupWizard() {
               {/* Step 3: Photos */}
               {currentStep === 3 && (
                 <div className="space-y-6">
+                  {!allowPhotoUpload && (
+                    <div className="rounded-lg border p-4 text-sm text-muted-foreground">
+                      Photo upload is disabled in this flow.
+                    </div>
+                  )}
                   <div className="grid grid-cols-3 gap-4">
                     {formData.photos.map((photo, index) => (
                       <div
@@ -671,7 +774,7 @@ export function ProfileSetupWizard() {
                       </div>
                     ))}
 
-                    {formData.photos.length < 6 && (
+                    {allowPhotoUpload && formData.photos.length < 6 && (
                       <button
                         onClick={handlePhotoUpload}
                         disabled={isUploading}
@@ -687,13 +790,15 @@ export function ProfileSetupWizard() {
                         </span>
                       </button>
                     )}
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      className="hidden"
-                      accept="image/*"
-                      onChange={handleFileChange}
-                    />
+                    {allowPhotoUpload && (
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                      />
+                    )}
                   </div>
 
                   <p className="text-sm text-muted-foreground">
@@ -959,7 +1064,7 @@ export function ProfileSetupWizard() {
                       </>
                     ) : (
                       <>
-                        Complete Profile
+                        {submitLabel}
                         <Check className="ml-2 h-4 w-4" />
                       </>
                     )}
@@ -971,83 +1076,87 @@ export function ProfileSetupWizard() {
         </div>
 
         {/* Live Preview */}
-        <div className="hidden lg:block">
-          <div className="sticky top-24">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Profile Preview</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-4">
-                    <Avatar className="w-16 h-16">
-                      <AvatarImage src={formData.photos[0] || ""} />
-                      <AvatarFallback>
-                        {formData.firstName[0]}
-                        {formData.lastName[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-semibold">
-                        {formData.firstName || "Your"}{" "}
-                        {formData.lastName || "Name"}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {formData.city || "City"},{" "}
-                        {states.find(
-                          (s) =>
-                            s.toLowerCase().replace(/\s+/g, "") ===
-                            formData.state,
-                        ) ||
-                          formData.state ||
-                          "State"}
-                      </p>
+        {showPreview && (
+          <div className="hidden lg:block">
+            <div className="sticky top-24">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Profile Preview</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-4">
+                      <Avatar className="w-16 h-16">
+                        <AvatarImage src={formData.photos[0] || ""} />
+                        <AvatarFallback>
+                          {formData.firstName[0]}
+                          {formData.lastName[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-semibold">
+                          {formData.firstName || "Your"}{" "}
+                          {formData.lastName || "Name"}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {formData.city || "City"},{" "}
+                          {states.find(
+                            (s) =>
+                              s.toLowerCase().replace(/\s+/g, "") ===
+                              formData.state,
+                          ) ||
+                            formData.state ||
+                            "State"}
+                        </p>
+                      </div>
                     </div>
+
+                    {formData.profession && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Briefcase className="h-4 w-4 text-muted-foreground" />
+                        <span className="capitalize">
+                          {formData.profession}
+                        </span>
+                      </div>
+                    )}
+
+                    {formData.education && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                        <span className="capitalize">{formData.education}</span>
+                      </div>
+                    )}
+
+                    {formData.bio && (
+                      <p className="text-sm text-muted-foreground line-clamp-3">
+                        {formData.bio}
+                      </p>
+                    )}
+
+                    {formData.interests.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {formData.interests.slice(0, 4).map((interest) => (
+                          <Badge
+                            key={interest}
+                            variant="secondary"
+                            className="text-xs"
+                          >
+                            {interest}
+                          </Badge>
+                        ))}
+                        {formData.interests.length > 4 && (
+                          <Badge variant="secondary" className="text-xs">
+                            +{formData.interests.length - 4}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
                   </div>
-
-                  {formData.profession && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Briefcase className="h-4 w-4 text-muted-foreground" />
-                      <span className="capitalize">{formData.profession}</span>
-                    </div>
-                  )}
-
-                  {formData.education && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <GraduationCap className="h-4 w-4 text-muted-foreground" />
-                      <span className="capitalize">{formData.education}</span>
-                    </div>
-                  )}
-
-                  {formData.bio && (
-                    <p className="text-sm text-muted-foreground line-clamp-3">
-                      {formData.bio}
-                    </p>
-                  )}
-
-                  {formData.interests.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {formData.interests.slice(0, 4).map((interest) => (
-                        <Badge
-                          key={interest}
-                          variant="secondary"
-                          className="text-xs"
-                        >
-                          {interest}
-                        </Badge>
-                      ))}
-                      {formData.interests.length > 4 && (
-                        <Badge variant="secondary" className="text-xs">
-                          +{formData.interests.length - 4}
-                        </Badge>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
