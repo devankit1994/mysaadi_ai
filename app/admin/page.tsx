@@ -43,10 +43,7 @@ import {
   LogOut,
   AlertCircle,
   MoreHorizontal,
-<<<<<<< HEAD
-=======
   Edit,
->>>>>>> bc13d09 (MYS-11: Completed tasks ie-Admin- added edit and delete options)
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -280,26 +277,6 @@ export default function AdminPage() {
     }
   };
 
-<<<<<<< HEAD
-  const handleDeleteUser = async (id: string | number) => {
-    if (!confirm("Are you sure you want to delete this user? This action cannot be undone.")) return;
-
-    try {
-      // First try to delete from profiles table
-      const { error } = await supabase
-        .from("profiles")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
-
-      toast.success("User deleted successfully");
-      // Refresh the user list
-      fetchUsers();
-    } catch (error) {
-      console.error("Failed to delete user:", error);
-      toast.error("Failed to delete user");
-=======
   const handleDeleteUser = async (userId: string | number) => {
     if (!window.confirm("Are you sure you want to delete this user?")) return;
 
@@ -336,7 +313,6 @@ export default function AdminPage() {
     } catch (error: any) {
       console.error("Failed to delete user:", error);
       toast.error(error.message || "Failed to delete user");
->>>>>>> bc13d09 (MYS-11: Completed tasks ie-Admin- added edit and delete options)
     }
   };
 
