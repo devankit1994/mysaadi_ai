@@ -43,6 +43,10 @@ import {
   LogOut,
   AlertCircle,
   MoreHorizontal,
+<<<<<<< HEAD
+=======
+  Edit,
+>>>>>>> bc13d09 (MYS-11: Completed tasks ie-Admin- added edit and delete options)
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -276,6 +280,7 @@ export default function AdminPage() {
     }
   };
 
+<<<<<<< HEAD
   const handleDeleteUser = async (id: string | number) => {
     if (!confirm("Are you sure you want to delete this user? This action cannot be undone.")) return;
 
@@ -294,6 +299,44 @@ export default function AdminPage() {
     } catch (error) {
       console.error("Failed to delete user:", error);
       toast.error("Failed to delete user");
+=======
+  const handleDeleteUser = async (userId: string | number) => {
+    if (!window.confirm("Are you sure you want to delete this user?")) return;
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        throw new Error("No active session found");
+      }
+
+      // If it's a numeric ID, it's likely from our placeholder data and not in DB
+      if (typeof userId === 'number') {
+        setUsers(users.filter(u => u.id !== userId));
+        toast.success("User deleted successfully");
+        return;
+      }
+
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => null);
+        throw new Error(errorData?.error || "Failed to delete user");
+      }
+      
+      toast.success("User deleted successfully");
+      fetchUsers();
+    } catch (error: any) {
+      console.error("Failed to delete user:", error);
+      toast.error(error.message || "Failed to delete user");
+>>>>>>> bc13d09 (MYS-11: Completed tasks ie-Admin- added edit and delete options)
     }
   };
 
@@ -657,12 +700,18 @@ export default function AdminPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/admin/users/${user.id}/edit`}>
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Edit
+                                  </Link>
+                                </DropdownMenuItem>
                                 <DropdownMenuItem
-                                  className="text-destructive cursor-pointer"
+                                  className="text-destructive focus:bg-destructive focus:text-destructive-foreground cursor-pointer"
                                   onClick={() => handleDeleteUser(user.id)}
                                 >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete User
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Delete
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
