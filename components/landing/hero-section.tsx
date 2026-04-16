@@ -88,7 +88,7 @@ export function HeroSection() {
                 asChild
                 className="rounded-full px-8 h-14 text-lg bg-transparent"
               >
-                <Link href="#profiles">Explore Matches</Link>
+                <Link href="/explore">Explore Matches</Link>
               </Button>
             </div>
 
