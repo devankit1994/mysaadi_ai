@@ -439,7 +439,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                <p className="mt-4 text-muted-foreground leading-relaxed">
+                <p className="mt-4 text-muted-foreground leading-relaxed break-words whitespace-pre-wrap">
                   {profile.bio}
                 </p>
               </CardContent>
@@ -600,8 +600,8 @@ export default function ProfilePage() {
                   Partner Preferences
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground leading-relaxed">
+              <CardContent className="overflow-hidden">
+                <p className="text-muted-foreground leading-relaxed break-words whitespace-pre-wrap">
                   {profile.lookingFor}
                 </p>
               </CardContent>

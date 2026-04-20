@@ -27,6 +27,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   User,
   Camera,
@@ -40,6 +47,7 @@ import {
   Heart,
   Home,
   AlertCircle,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
@@ -268,15 +276,7 @@ export default function AdminEditProfilePage() {
   const ProfileFormSkeleton = () => {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-48" />
-            <Skeleton className="h-4 w-80" />
-          </div>
-          <Skeleton className="h-10 w-40 rounded-full" />
-        </div>
-
-        <div className="space-y-6">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex flex-wrap gap-2">
             <Skeleton className="h-10 w-28 rounded-full" />
             <Skeleton className="h-10 w-24 rounded-full" />
@@ -284,7 +284,14 @@ export default function AdminEditProfilePage() {
             <Skeleton className="h-10 w-24 rounded-full" />
             <Skeleton className="h-10 w-40 rounded-full" />
           </div>
+          
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-9 w-24 rounded-md" />
+            <Skeleton className="h-10 w-32 rounded-full" />
+          </div>
+        </div>
 
+        <div className="space-y-6">
           <Card>
             <CardHeader>
               <Skeleton className="h-6 w-56" />
@@ -347,8 +354,53 @@ export default function AdminEditProfilePage() {
     );
   };
 
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push("/admin");
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-background">
+      {/* Admin Header */}
+      <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link href="/" className="flex items-center gap-2">
+              <Heart className="h-7 w-7 text-primary fill-primary" />
+              <span className="text-xl font-bold">
+                My<span className="text-primary">Saadi</span>
+              </span>
+            </Link>
+            <Badge variant="secondary">Admin Panel</Badge>
+          </div>
+          <div className="flex items-center gap-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="relative h-8 w-8 rounded-full"
+                >
+                  <Avatar>
+                    <AvatarImage src="/admin-avatar-profile.jpg" />
+                    <AvatarFallback>AD</AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={handleSignOut}
+                  className="text-destructive cursor-pointer"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </header>
+
+      <main className="container mx-auto px-4 py-6 space-y-6">
       {loadError ? (
         <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-3">
           <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
@@ -363,44 +415,9 @@ export default function AdminEditProfilePage() {
         <ProfileFormSkeleton />
       ) : (
         <>
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/admin">Back to Admin</Link>
-                </Button>
-              </div>
-              <h1 className="text-2xl font-bold">Edit User Profile</h1>
-              <p className="text-muted-foreground">
-                Update user profile information and preferences
-              </p>
-            </div>
-            <Button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="rounded-full"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : saveSuccess ? (
-                <>
-                  <Check className="mr-2 h-4 w-4" />
-                  Saved!
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Changes
-                </>
-              )}
-            </Button>
-          </div>
-
           <Tabs defaultValue="basic" className="space-y-6">
-            <TabsList className="flex flex-wrap h-auto gap-2 bg-transparent p-0">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <TabsList className="flex flex-wrap h-auto gap-2 bg-transparent p-0">
               <TabsTrigger
                 value="basic"
                 className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-4"
@@ -436,7 +453,36 @@ export default function AdminEditProfilePage() {
                 <Heart className="h-4 w-4 mr-2" />
                 About & Interests
               </TabsTrigger>
-            </TabsList>
+              </TabsList>
+
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/admin">Back to Admin</Link>
+                </Button>
+                <Button
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="rounded-full"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : saveSuccess ? (
+                    <>
+                      <Check className="mr-2 h-4 w-4" />
+                      Saved!
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Save Changes
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
 
             {/* Basic Info Tab */}
             <TabsContent value="basic">
@@ -1121,6 +1167,7 @@ export default function AdminEditProfilePage() {
           </Tabs>
         </>
       )}
+      </main>
     </div>
   );
 }
