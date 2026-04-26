@@ -42,6 +42,9 @@ import {
   Loader2,
   LogOut,
   AlertCircle,
+  MoreHorizontal,
+  Edit,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -271,6 +274,45 @@ export default function AdminPage() {
       toast.error("Failed to load users");
     } finally {
       setUsersLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string | number) => {
+    if (!window.confirm("Are you sure you want to delete this user?")) return;
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        throw new Error("No active session found");
+      }
+
+      // If it's a numeric ID, it's likely from our placeholder data and not in DB
+      if (typeof userId === 'number') {
+        setUsers(users.filter(u => u.id !== userId));
+        toast.success("User deleted successfully");
+        return;
+      }
+
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => null);
+        throw new Error(errorData?.error || "Failed to delete user");
+      }
+      
+      toast.success("User deleted successfully");
+      fetchUsers();
+    } catch (error: any) {
+      console.error("Failed to delete user:", error);
+      toast.error(error.message || "Failed to delete user");
     }
   };
 
@@ -555,19 +597,20 @@ export default function AdminPage() {
                       <TableHead>Joined</TableHead>
                       <TableHead>Profile</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {usersLoading ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8">
+                        <TableCell colSpan={6} className="text-center py-8">
                           <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                         </TableCell>
                       </TableRow>
                     ) : users.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={7}
+                          colSpan={6}
                           className="text-center py-8 text-muted-foreground"
                         >
                           No users found
@@ -623,6 +666,31 @@ export default function AdminPage() {
                             >
                               {user.status}
                             </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                  <span className="sr-only">Open menu</span>
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/admin/users/${user.id}/edit`}>
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Edit
+                                  </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-destructive focus:bg-destructive focus:text-destructive-foreground cursor-pointer"
+                                  onClick={() => handleDeleteUser(user.id)}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                         </TableRow>
                       ))

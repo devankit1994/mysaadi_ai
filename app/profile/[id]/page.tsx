@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
+import { useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -42,55 +43,40 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Mock profile data
-const profile = {
-  id: 1,
-  name: "Rahul Sharma",
-  age: 28,
-  city: "Delhi",
-  state: "Delhi NCR",
-  profession: "Product Manager",
-  company: "Google",
-  education: "MBA - IIM Ahmedabad",
-  college: "B.Tech - IIT Delhi",
-  images: [
-    "/handsome-indian-man-professional-portrait-smiling.jpg",
-    "/indian-man-casual-outdoor-portrait.jpg",
-    "/indian-man-formal-event-portrait.jpg",
-    "/indian-man-travel-adventure-portrait.jpg",
-  ],
-  interests: ["Fitness", "Movies", "Cricket", "Travel", "Music", "Photography"],
-  compatibility: 95,
-  verified: true,
-  religion: "Hindu",
-  height: "5'10\"",
-  weight: "75 kg",
-  maritalStatus: "Never Married",
-  motherTongue: "Hindi",
-  familyType: "Nuclear Family",
-  familyStatus: "Upper Middle Class",
-  fatherOccupation: "Businessman",
-  motherOccupation: "Homemaker",
-  siblings: "1 Brother (Married)",
-  diet: "Non-Vegetarian",
-  drinking: "Occasionally",
-  smoking: "Never",
-  bio: "Hey there! I'm a passionate product manager who believes in building products that make a difference. When I'm not crunching numbers or leading sprints, you'll find me at the gym, exploring new hiking trails, or catching up on the latest cricket match. I value genuine connections and am looking for someone who shares my love for adventure and meaningful conversations. Let's build something beautiful together!",
-  lookingFor:
-    "I'm looking for a partner who is ambitious, kind-hearted, and has a great sense of humor. Someone who values family, enjoys traveling, and is open to new experiences. Education and career are important, but so is emotional intelligence and the ability to communicate openly.",
-  income: "₹25-50 LPA",
-  contactLocked: true,
-  phone: "+91 98XXX XXXXX",
-  whatsapp: "+91 98XXX XXXXX",
-};
-
 export default function ProfilePage() {
+  const params = useParams();
+  const [profile, setProfile] = useState<any>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isUnlockModalOpen, setIsUnlockModalOpen] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      setIsLoadingProfile(true);
+      setProfileError(null);
+      try {
+        const res = await fetch(`/api/profile/${params.id}`);
+        if (!res.ok) {
+          throw new Error(await res.text());
+        }
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        setProfile(data.profile);
+      } catch (e: any) {
+        console.error(e);
+        setProfileError("Failed to load profile. It might not exist.");
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    };
+    if (params?.id) fetchProfile();
+  }, [params?.id]);
 
   const loadRazorpay = useCallback((): Promise<boolean> => {
     return new Promise((resolve) => {
@@ -116,7 +102,7 @@ export default function ProfilePage() {
   }, []);
 
   const startUnlockPayment = useCallback(async () => {
-    if (isUnlocked || isPaying) return;
+    if (!profile || isUnlocked || isPaying) return;
 
     setIsPaying(true);
 
@@ -205,17 +191,39 @@ export default function ProfilePage() {
       alert("Unable to start payment. Please try again.");
       setIsPaying(false);
     }
-  }, [isPaying, isUnlocked, loadRazorpay]);
+  }, [profile, isPaying, isUnlocked, loadRazorpay]);
 
   const nextImage = () => {
+    if (!profile) return;
     setCurrentImageIndex((prev) => (prev + 1) % profile.images.length);
   };
 
   const prevImage = () => {
+    if (!profile) return;
     setCurrentImageIndex(
       (prev) => (prev - 1 + profile.images.length) % profile.images.length,
     );
   };
+
+  if (isLoadingProfile) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+        <p className="mt-4 text-muted-foreground">Loading profile...</p>
+      </div>
+    );
+  }
+
+  if (profileError || !profile) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
+        <h2 className="text-xl font-semibold text-destructive">{profileError || "Profile not found"}</h2>
+        <Button asChild>
+          <Link href="/explore">Back to Explore</Link>
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -281,7 +289,7 @@ export default function ProfilePage() {
 
                 {/* Dots indicator */}
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-                  {profile.images.map((_, index) => (
+                  {profile.images.map((_: any, index: number) => (
                     <button
                       key={index}
                       onClick={() => setCurrentImageIndex(index)}
@@ -312,7 +320,7 @@ export default function ProfilePage() {
 
             {/* Thumbnails */}
             <div className="grid grid-cols-4 gap-2">
-              {profile.images.map((image, index) => (
+              {profile.images.map((image: string, index: number) => (
                 <button
                   key={index}
                   onClick={() => setCurrentImageIndex(index)}
@@ -431,7 +439,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                <p className="mt-4 text-muted-foreground leading-relaxed">
+                <p className="mt-4 text-muted-foreground leading-relaxed break-words whitespace-pre-wrap">
                   {profile.bio}
                 </p>
               </CardContent>
@@ -571,7 +579,7 @@ export default function ProfilePage() {
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-2">
-                  {profile.interests.map((interest) => (
+                  {profile.interests.map((interest: string) => (
                     <Badge
                       key={interest}
                       variant="secondary"
@@ -592,8 +600,8 @@ export default function ProfilePage() {
                   Partner Preferences
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground leading-relaxed">
+              <CardContent className="overflow-hidden">
+                <p className="text-muted-foreground leading-relaxed break-words whitespace-pre-wrap">
                   {profile.lookingFor}
                 </p>
               </CardContent>
