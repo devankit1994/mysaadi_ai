@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
@@ -42,6 +43,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/use-auth";
 
 type ExploreProfile = {
   id: string;
@@ -113,29 +115,14 @@ export default function ExplorePage() {
   const [profiles, setProfiles] = useState<ExploreProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const { user, isLoading: isAuthLoading } = useAuth();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    let mounted = true;
-    supabase.auth
-      .getUser()
-      .then(({ data, error }) => {
-        if (!mounted) return;
-        if (error) {
-          setCurrentUserId(null);
-          return;
-        }
-        setCurrentUserId(data.user?.id ?? null);
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setCurrentUserId(null);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    if (!isAuthLoading) {
+      setCurrentUserId(user?.id ?? null);
+    }
+  }, [user, isAuthLoading]);
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
