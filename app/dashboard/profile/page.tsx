@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import { validateProfileField, validateProfileForm } from "@/lib/validations";
 
 const interests = [
   "Travel",
@@ -64,6 +65,7 @@ const interests = [
 export default function EditProfilePage() {
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [loadError, setLoadError] = useState<string>("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -100,6 +102,33 @@ export default function EditProfilePage() {
     showLastActive: true,
     emailNotifications: true,
   });
+
+  const updateFormData = (field: string, value: string | boolean) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        if (Object.keys(newErrors).length === 0 && loadError === "Please correct the highlighted fields.") {
+          setLoadError("");
+        }
+        return newErrors;
+      });
+    }
+  };
+
+  const handleBlur = (field: string) => {
+    const error = validateProfileField(field, formData[field as keyof typeof formData] as string);
+    setErrors((prev) => {
+      const newErrors = { ...prev };
+      if (error) {
+        newErrors[field] = error;
+      } else {
+        delete newErrors[field];
+      }
+      return newErrors;
+    });
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -194,6 +223,25 @@ export default function EditProfilePage() {
   };
 
   const handleSave = async () => {
+    const formErrors = validateProfileForm(formData);
+    if (formErrors) {
+      setErrors(formErrors);
+      setLoadError("Please correct the highlighted fields.");
+      
+      const firstErrorField = Object.keys(formErrors)[0];
+      const elementId = firstErrorField === "dateOfBirth" ? "dob" : firstErrorField;
+      const element = document.getElementById(elementId);
+      
+      // We also might need to ensure the correct tab is selected, but for now we'll just focus.
+      if (element) {
+        element.focus();
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+      } else {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+      return;
+    }
+
     setIsSaving(true);
     setSaveSuccess(false);
     setLoadError("");
@@ -332,8 +380,14 @@ export default function EditProfilePage() {
         <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20 flex items-start gap-3">
           <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
           <div className="text-sm text-destructive">
-            <p className="font-medium">Something went wrong</p>
-            <p className="mt-1">{loadError}</p>
+            <p className="font-medium">
+              {loadError === "Please correct the highlighted fields." 
+                ? "Please correct the highlighted fields." 
+                : "Something went wrong"}
+            </p>
+            {loadError !== "Please correct the highlighted fields." && (
+              <p className="mt-1">{loadError}</p>
+            )}
           </div>
         </div>
       ) : null}
@@ -425,54 +479,64 @@ export default function EditProfilePage() {
                 <CardContent className="space-y-6">
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="firstName">First Name</Label>
+                      <Label htmlFor="firstName">
+                        First Name <span className="text-destructive">*</span>
+                      </Label>
                       <Input
                         id="firstName"
                         value={formData.firstName}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            firstName: e.target.value,
-                          })
-                        }
+                        onChange={(e) => updateFormData("firstName", e.target.value)}
+                        onBlur={() => handleBlur("firstName")}
+                        aria-invalid={!!errors.firstName}
+                        className={errors.firstName ? "border-destructive focus-visible:ring-destructive" : ""}
                       />
+                      {errors.firstName && <p className="text-sm text-destructive">{errors.firstName}</p>}
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="lastName">Last Name</Label>
+                      <Label htmlFor="lastName">
+                        Last Name <span className="text-destructive">*</span>
+                      </Label>
                       <Input
                         id="lastName"
                         value={formData.lastName}
-                        onChange={(e) =>
-                          setFormData({ ...formData, lastName: e.target.value })
-                        }
+                        onChange={(e) => updateFormData("lastName", e.target.value)}
+                        onBlur={() => handleBlur("lastName")}
+                        aria-invalid={!!errors.lastName}
+                        className={errors.lastName ? "border-destructive focus-visible:ring-destructive" : ""}
                       />
+                      {errors.lastName && <p className="text-sm text-destructive">{errors.lastName}</p>}
                     </div>
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="dob">Date of Birth</Label>
+                      <Label htmlFor="dob">
+                        Date of Birth <span className="text-destructive">*</span>
+                      </Label>
                       <Input
                         id="dob"
                         type="date"
                         value={formData.dateOfBirth}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            dateOfBirth: e.target.value,
-                          })
-                        }
+                        onChange={(e) => updateFormData("dateOfBirth", e.target.value)}
+                        onBlur={() => handleBlur("dateOfBirth")}
+                        aria-invalid={!!errors.dateOfBirth}
+                        className={errors.dateOfBirth ? "border-destructive focus-visible:ring-destructive" : ""}
                       />
+                      {errors.dateOfBirth && <p className="text-sm text-destructive">{errors.dateOfBirth}</p>}
                     </div>
                     <div className="space-y-2">
-                      <Label>Gender</Label>
+                      <Label>
+                        Gender <span className="text-destructive">*</span>
+                      </Label>
                       <Select
                         value={formData.gender}
-                        onValueChange={(v) =>
-                          setFormData({ ...formData, gender: v })
-                        }
+                        onValueChange={(v) => updateFormData("gender", v)}
                       >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger
+                          id="gender"
+                          className={errors.gender ? "border-destructive focus:ring-destructive" : ""}
+                          aria-invalid={!!errors.gender}
+                        >
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -481,23 +545,27 @@ export default function EditProfilePage() {
                           <SelectItem value="other">Other</SelectItem>
                         </SelectContent>
                       </Select>
+                      {errors.gender && <p className="text-sm text-destructive">{errors.gender}</p>}
                     </div>
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="city">City</Label>
+                      <Label htmlFor="city">
+                        City <span className="text-destructive">*</span>
+                      </Label>
                       <div className="relative">
                         <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                           id="city"
                           value={formData.city}
-                          onChange={(e) =>
-                            setFormData({ ...formData, city: e.target.value })
-                          }
-                          className="pl-10"
+                          onChange={(e) => updateFormData("city", e.target.value)}
+                          onBlur={() => handleBlur("city")}
+                          aria-invalid={!!errors.city}
+                          className={cn("pl-10", errors.city ? "border-destructive focus-visible:ring-destructive" : "")}
                         />
                       </div>
+                      {errors.city && <p className="text-sm text-destructive">{errors.city}</p>}
                     </div>
                     <div className="space-y-2">
                       <Label>State</Label>
