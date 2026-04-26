@@ -2,38 +2,38 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createSupabaseAdminClient } from "@/lib/supabase";
 
-const CreateUserSchema = z.object({
-  email: z.string().email(),
-  phone: z.string().trim().max(30).optional(),
+  const CreateUserSchema = z.object({
+    email: z.string().email(),
+    phone: z.string().trim().max(30).optional(),
 
-  // Profile fields (mirrors the onboarding wizard)
-  firstName: z.string().trim().max(100).optional().default(""),
-  lastName: z.string().trim().max(100).optional().default(""),
-  dateOfBirth: z.string().trim().max(30).optional().default(""), // YYYY-MM-DD from <input type="date" />
-  gender: z.string().trim().max(50).optional().default(""),
-  city: z.string().trim().max(100).optional().default(""),
-  state: z.string().trim().max(100).optional().default(""),
+    // Profile fields (mirrors the onboarding wizard)
+    firstName: z.string().trim().min(1).max(100),
+    lastName: z.string().trim().min(1).max(100),
+    dateOfBirth: z.string().trim().min(1).max(30), // YYYY-MM-DD from <input type="date" />
+    gender: z.string().trim().min(1).max(50),
+    city: z.string().trim().min(1).max(100),
+    state: z.string().trim().min(1).max(100),
 
-  lookingFor: z.string().trim().max(50).optional().default(""),
-  ageRangeMin: z.coerce.number().int().min(18).max(99).optional().default(18),
-  ageRangeMax: z.coerce.number().int().min(18).max(99).optional().default(35),
-  preferredReligion: z.string().trim().max(50).optional().default(""),
-  preferredCity: z.string().trim().max(100).optional().default(""),
+    lookingFor: z.string().trim().min(1).max(50),
+    ageRangeMin: z.coerce.number().int().min(18).max(99),
+    ageRangeMax: z.coerce.number().int().min(18).max(99),
+    preferredReligion: z.string().trim().min(1).max(50),
+    preferredCity: z.string().trim().min(1).max(100),
 
-  photos: z.array(z.string().trim().min(1)).optional().default([]),
-  education: z.string().trim().max(100).optional().default(""),
-  profession: z.string().trim().max(100).optional().default(""),
-  income: z.string().trim().max(100).optional().default(""),
-  familyType: z.string().trim().max(50).optional().default(""),
-  diet: z.string().trim().max(50).optional().default(""),
-  drinking: z.string().trim().max(50).optional().default(""),
-  smoking: z.string().trim().max(50).optional().default(""),
+    photos: z.array(z.string().trim().min(1)).optional().default([]),
+    education: z.string().trim().min(1).max(100),
+    profession: z.string().trim().min(1).max(100),
+    income: z.string().trim().min(1).max(100),
+    familyType: z.string().trim().min(1).max(50),
+    diet: z.string().trim().min(1).max(50),
+    drinking: z.string().trim().min(1).max(50),
+    smoking: z.string().trim().min(1).max(50),
 
-  bio: z.string().trim().max(2000).optional().default(""),
-  interests: z.array(z.string().trim().min(1)).optional().default([]),
+    bio: z.string().trim().min(1).max(2000),
+    interests: z.array(z.string().trim().min(1)).optional().default([]),
 
-  isComplete: z.boolean().optional().default(true),
-});
+    isComplete: z.boolean().optional().default(true),
+  });
 
 async function parseRequestPayload(req: Request): Promise<{
   payload: z.infer<typeof CreateUserSchema>;
