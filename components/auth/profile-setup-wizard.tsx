@@ -45,6 +45,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import { validateProfileField, validateProfileForm } from "@/lib/validations";
 
 const steps = [
   { id: 1, title: "Basic Info", icon: User },
@@ -242,6 +243,7 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [pendingPhotos, setPendingPhotos] = useState<Record<string, File>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -253,6 +255,29 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
 
   const updateFormData = (field: string, value: string | string[]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        if (Object.keys(newErrors).length === 0 && submitError === "Please correct the highlighted fields.") {
+          setSubmitError("");
+        }
+        return newErrors;
+      });
+    }
+  };
+
+  const handleBlur = (field: string) => {
+    const error = validateProfileField(field, formData[field as keyof ProfileFormData] as string);
+    setErrors((prev) => {
+      const newErrors = { ...prev };
+      if (error) {
+        newErrors[field] = error;
+      } else {
+        delete newErrors[field];
+      }
+      return newErrors;
+    });
   };
 
   const toggleInterest = (interest: string) => {
@@ -306,6 +331,24 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
   };
 
   const nextStep = async () => {
+    setSubmitError("");
+    if (currentStep === 1) {
+      const formErrors = validateProfileForm(formData);
+      if (formErrors) {
+        setErrors(formErrors);
+        setSubmitError("Please correct the highlighted fields.");
+        
+        const firstErrorField = Object.keys(formErrors)[0];
+        const elementId = firstErrorField === "dateOfBirth" ? "dob" : firstErrorField;
+        const element = document.getElementById(elementId);
+        if (element) {
+          element.focus();
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        return;
+      }
+    }
+
     if (currentStep === 3 && allowPhotoUpload && !deferPhotoUpload) {
       // Check if there are any pending photos to upload
       const pendingUrls = Object.keys(pendingPhotos);
@@ -374,6 +417,24 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
   };
 
   const handleSubmit = async () => {
+    const formErrors = validateProfileForm(formData);
+    if (formErrors) {
+      setErrors(formErrors);
+      setSubmitError("Please correct the highlighted fields.");
+      setCurrentStep(1); // Go back to step 1 where the required fields are
+      
+      setTimeout(() => {
+        const firstErrorField = Object.keys(formErrors)[0];
+        const elementId = firstErrorField === "dateOfBirth" ? "dob" : firstErrorField;
+        const element = document.getElementById(elementId);
+        if (element) {
+          element.focus();
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 100);
+      return;
+    }
+
     setIsLoading(true);
     setSubmitError("");
     try {
@@ -519,31 +580,45 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
                 <>
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="firstName">First Name</Label>
+                      <Label htmlFor="firstName">
+                        First Name <span className="text-destructive">*</span>
+                      </Label>
                       <Input
                         id="firstName"
                         value={formData.firstName}
                         onChange={(e) =>
                           updateFormData("firstName", e.target.value)
                         }
+                        onBlur={() => handleBlur("firstName")}
+                        aria-invalid={!!errors.firstName}
+                        className={errors.firstName ? "border-destructive focus-visible:ring-destructive" : ""}
                         placeholder="Enter your first name"
                       />
+                      {errors.firstName && <p className="text-sm text-destructive">{errors.firstName}</p>}
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="lastName">Last Name</Label>
+                      <Label htmlFor="lastName">
+                        Last Name <span className="text-destructive">*</span>
+                      </Label>
                       <Input
                         id="lastName"
                         value={formData.lastName}
                         onChange={(e) =>
                           updateFormData("lastName", e.target.value)
                         }
+                        onBlur={() => handleBlur("lastName")}
+                        aria-invalid={!!errors.lastName}
+                        className={errors.lastName ? "border-destructive focus-visible:ring-destructive" : ""}
                         placeholder="Enter your last name"
                       />
+                      {errors.lastName && <p className="text-sm text-destructive">{errors.lastName}</p>}
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="dob">Date of Birth</Label>
+                    <Label htmlFor="dob">
+                      Date of Birth <span className="text-destructive">*</span>
+                    </Label>
                     <div className="relative">
                       <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -553,17 +628,24 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
                         onChange={(e) =>
                           updateFormData("dateOfBirth", e.target.value)
                         }
-                        className="pl-10"
+                        onBlur={() => handleBlur("dateOfBirth")}
+                        aria-invalid={!!errors.dateOfBirth}
+                        className={cn("pl-10", errors.dateOfBirth ? "border-destructive focus-visible:ring-destructive" : "")}
                       />
                     </div>
+                    {errors.dateOfBirth && <p className="text-sm text-destructive">{errors.dateOfBirth}</p>}
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Gender</Label>
+                    <Label>
+                      Gender <span className="text-destructive">*</span>
+                    </Label>
                     <RadioGroup
+                      id="gender"
                       value={formData.gender}
                       onValueChange={(value) => updateFormData("gender", value)}
-                      className="flex gap-4"
+                      onBlur={() => handleBlur("gender")}
+                      className={cn("flex gap-4 p-1", errors.gender ? "rounded-md border border-destructive" : "")}
                     >
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="male" id="male" />
@@ -584,11 +666,14 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
                         </Label>
                       </div>
                     </RadioGroup>
+                    {errors.gender && <p className="text-sm text-destructive">{errors.gender}</p>}
                   </div>
 
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="city">City</Label>
+                      <Label htmlFor="city">
+                        City <span className="text-destructive">*</span>
+                      </Label>
                       <div className="relative">
                         <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -597,10 +682,13 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
                           onChange={(e) =>
                             updateFormData("city", e.target.value)
                           }
+                          onBlur={() => handleBlur("city")}
+                          aria-invalid={!!errors.city}
+                          className={cn("pl-10", errors.city ? "border-destructive focus-visible:ring-destructive" : "")}
                           placeholder="Enter your city"
-                          className="pl-10"
                         />
                       </div>
+                      {errors.city && <p className="text-sm text-destructive">{errors.city}</p>}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="state">State</Label>
