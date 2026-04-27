@@ -203,23 +203,44 @@ export default function AdminEditProfilePage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+  const [selectingIndex, setSelectingIndex] = useState<number | null>(null);
+  const targetIndexRef = useRef<number | null>(null);
 
   const handlePhotoUpload = (index: number) => {
-    setUploadingIndex(index);
+    targetIndexRef.current = index;
+    setSelectingIndex(index);
     if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+      
+      const handleFocus = () => {
+        setTimeout(() => {
+          setSelectingIndex(null);
+          window.removeEventListener('focus', handleFocus);
+        }, 300);
+      };
+      
+      window.addEventListener('focus', handleFocus);
       fileInputRef.current.click();
     }
   };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectingIndex(null);
     const file = event.target.files?.[0];
-    if (!file || uploadingIndex === null) return;
+    const index = targetIndexRef.current;
+    if (!file || index === null) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert("File size should be less than 5MB");
+    if (!file.type.startsWith("image/")) {
+      alert("Please select an image file");
       return;
     }
 
+    if (file.size > 1 * 1024 * 1024) {
+      alert("File size should be less than or equal to 1MB");
+      return;
+    }
+
+    setUploadingIndex(index);
     try {
       const fileExt = file.name.split(".").pop();
       const fileName = `${id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
@@ -233,13 +254,14 @@ export default function AdminEditProfilePage() {
       const { data: { publicUrl } } = supabase.storage.from("photos").getPublicUrl(fileName);
 
       const newPhotos = [...photos];
-      newPhotos[uploadingIndex] = publicUrl;
+      newPhotos[index as number] = publicUrl;
       setPhotos(newPhotos);
     } catch (error) {
       console.error("Error uploading photo:", error);
       alert("Failed to upload photo. Please try again.");
     } finally {
       setUploadingIndex(null);
+      targetIndexRef.current = null;
       if (event.target) {
         event.target.value = "";
       }
@@ -758,10 +780,10 @@ export default function AdminEditProfilePage() {
                         ) : (
                           <button
                             onClick={() => handlePhotoUpload(index)}
-                            disabled={uploadingIndex === index}
+                            disabled={uploadingIndex === index || selectingIndex === index}
                             className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary hover:border-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            {uploadingIndex === index ? (
+                            {uploadingIndex === index || selectingIndex === index ? (
                               <>
                                 <Loader2 className="h-8 w-8 animate-spin" />
                                 <span className="text-sm">Uploading...</span>

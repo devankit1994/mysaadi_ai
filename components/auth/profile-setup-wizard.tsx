@@ -241,6 +241,7 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSelectingFile, setIsSelectingFile] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [pendingPhotos, setPendingPhotos] = useState<Record<string, File>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -265,10 +266,24 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
   };
 
   const handlePhotoUpload = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    
+    const handleFocus = () => {
+      setTimeout(() => {
+        setIsSelectingFile(false);
+        window.removeEventListener('focus', handleFocus);
+      }, 300);
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    setIsSelectingFile(true);
     fileInputRef.current?.click();
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setIsSelectingFile(false);
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -278,7 +293,7 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
     }
 
     if (file.size > 1 * 1024 * 1024) {
-      alert("File size should be less than 1MB");
+      alert("File size should be less than or equal to 1MB");
       return;
     }
 
@@ -782,16 +797,16 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
                     {allowPhotoUpload && formData.photos.length < 6 && (
                       <button
                         onClick={handlePhotoUpload}
-                        disabled={isUploading}
+                        disabled={isUploading || isSelectingFile}
                         className="aspect-square rounded-xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {isUploading ? (
+                        {isUploading || isSelectingFile ? (
                           <Loader2 className="h-8 w-8 animate-spin" />
                         ) : (
                           <Upload className="h-8 w-8" />
                         )}
                         <span className="text-sm">
-                          {isUploading ? "Uploading..." : "Add Photo"}
+                          {isUploading || isSelectingFile ? "Uploading..." : "Add Photo"}
                         </span>
                       </button>
                     )}
