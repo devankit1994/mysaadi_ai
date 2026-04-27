@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -201,11 +201,49 @@ export default function AdminEditProfilePage() {
     );
   };
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+
   const handlePhotoUpload = (index: number) => {
-    const newPhotos = [...photos];
-    newPhotos[index] =
-      `/placeholder.svg?height=300&width=300&query=person portrait ${index + 1}`;
-    setPhotos(newPhotos);
+    setUploadingIndex(index);
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || uploadingIndex === null) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("File size should be less than 5MB");
+      return;
+    }
+
+    try {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("photos")
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage.from("photos").getPublicUrl(fileName);
+
+      const newPhotos = [...photos];
+      newPhotos[uploadingIndex] = publicUrl;
+      setPhotos(newPhotos);
+    } catch (error) {
+      console.error("Error uploading photo:", error);
+      alert("Failed to upload photo. Please try again.");
+    } finally {
+      setUploadingIndex(null);
+      if (event.target) {
+        event.target.value = "";
+      }
+    }
   };
 
   const removePhoto = (index: number) => {
@@ -720,15 +758,33 @@ export default function AdminEditProfilePage() {
                         ) : (
                           <button
                             onClick={() => handlePhotoUpload(index)}
-                            className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary hover:border-primary transition-colors"
+                            disabled={uploadingIndex === index}
+                            className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary hover:border-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            <Upload className="h-8 w-8" />
-                            <span className="text-sm">Add Photo</span>
+                            {uploadingIndex === index ? (
+                              <>
+                                <Loader2 className="h-8 w-8 animate-spin" />
+                                <span className="text-sm">Uploading...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="h-8 w-8" />
+                                <span className="text-sm">Add Photo</span>
+                              </>
+                            )}
                           </button>
                         )}
                       </div>
                     ))}
                   </div>
+
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                  />
 
                   <div className="mt-6 p-4 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-3">
                     <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
