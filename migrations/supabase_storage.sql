@@ -1,8 +1,16 @@
 -- Create a new storage bucket for photos
 -- Note: You can also do this in the Supabase Dashboard under Storage
-insert into storage.buckets (id, name, public)
-values ('photos', 'photos', true)
-on conflict (id) do nothing;
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'photos',
+  'photos',
+  true,
+  1048576, -- 1MB limit
+  array['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+)
+on conflict (id) do update set
+  file_size_limit = 1048576,
+  allowed_mime_types = array['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 
 -- Set up Row Level Security (RLS) for the photos bucket
 -- This assumes you have enabled RLS on storage.objects, which is true by default in new projects
