@@ -51,6 +51,11 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import {
+  validateImageFile,
+  uploadPhotoToSupabase,
+  setupFilePickerFocusListener,
+} from "@/lib/upload-utils";
 
 const interests = [
   "Travel",
@@ -212,14 +217,10 @@ export default function AdminEditProfilePage() {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
       
-      const handleFocus = () => {
-        setTimeout(() => {
-          setSelectingIndex(null);
-          window.removeEventListener('focus', handleFocus);
-        }, 300);
-      };
+      setupFilePickerFocusListener(() => {
+        setSelectingIndex(null);
+      });
       
-      window.addEventListener('focus', handleFocus);
       fileInputRef.current.click();
     }
   };
@@ -230,28 +231,15 @@ export default function AdminEditProfilePage() {
     const index = targetIndexRef.current;
     if (!file || index === null) return;
 
-    if (!file.type.startsWith("image/")) {
-      alert("Please select an image file");
-      return;
-    }
-
-    if (file.size > 1 * 1024 * 1024) {
-      alert("File size should be less than or equal to 1MB");
+    const validation = validateImageFile(file);
+    if (!validation.isValid) {
+      alert(validation.error);
       return;
     }
 
     setUploadingIndex(index);
     try {
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("photos")
-        .upload(fileName, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage.from("photos").getPublicUrl(fileName);
+      const publicUrl = await uploadPhotoToSupabase(file, id as string);
 
       const newPhotos = [...photos];
       newPhotos[index as number] = publicUrl;

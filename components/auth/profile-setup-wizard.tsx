@@ -45,6 +45,11 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import {
+  validateImageFile,
+  uploadPhotoToSupabase,
+  setupFilePickerFocusListener,
+} from "@/lib/upload-utils";
 
 const steps = [
   { id: 1, title: "Basic Info", icon: User },
@@ -270,14 +275,10 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
       fileInputRef.current.value = "";
     }
     
-    const handleFocus = () => {
-      setTimeout(() => {
-        setIsSelectingFile(false);
-        window.removeEventListener('focus', handleFocus);
-      }, 300);
-    };
+    setupFilePickerFocusListener(() => {
+      setIsSelectingFile(false);
+    });
     
-    window.addEventListener('focus', handleFocus);
     setIsSelectingFile(true);
     fileInputRef.current?.click();
   };
@@ -287,13 +288,9 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      alert("Please select an image file");
-      return;
-    }
-
-    if (file.size > 1 * 1024 * 1024) {
-      alert("File size should be less than or equal to 1MB");
+    const validation = validateImageFile(file);
+    if (!validation.isValid) {
+      alert(validation.error);
       return;
     }
 
@@ -345,18 +342,7 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
             if (!newPhotos.includes(url)) continue;
 
             const file = pendingPhotos[url];
-            const fileExt = file.name.split(".").pop();
-            const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-            const { error: uploadError } = await supabase.storage
-              .from("photos")
-              .upload(fileName, file);
-
-            if (uploadError) throw uploadError;
-
-            const {
-              data: { publicUrl },
-            } = supabase.storage.from("photos").getPublicUrl(fileName);
+            const publicUrl = await uploadPhotoToSupabase(file, user.id);
 
             // Replace the blob URL with the actual Supabase URL
             const index = newPhotos.indexOf(url);
