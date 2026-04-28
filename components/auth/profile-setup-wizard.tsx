@@ -47,100 +47,27 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { validateProfileField, validateProfileForm } from "@/lib/validations";
 
+import {
+  interests,
+  religions,
+  educationLevels,
+  professions,
+  states,
+  incomeRanges,
+  familyTypes,
+  dietOptions,
+  drinkingOptions,
+  smokingOptions,
+} from "@/lib/profile-constants";
+import { useProfileValidation } from "@/hooks/use-profile-validation";
+import { ProfileInput, ProfileSelect } from "@/components/profile/profile-form-fields";
+
 const steps = [
   { id: 1, title: "Basic Info", icon: User },
   { id: 2, title: "Preferences", icon: Heart },
   { id: 3, title: "Photos", icon: Camera },
   { id: 4, title: "Lifestyle", icon: Sparkles },
   { id: 5, title: "About Me", icon: User },
-];
-
-const interests = [
-  "Travel",
-  "Music",
-  "Reading",
-  "Fitness",
-  "Movies",
-  "Cooking",
-  "Photography",
-  "Art",
-  "Gaming",
-  "Sports",
-  "Dancing",
-  "Yoga",
-  "Tech",
-  "Fashion",
-  "Food",
-  "Nature",
-];
-
-const religions = [
-  "Hindu",
-  "Muslim",
-  "Christian",
-  "Sikh",
-  "Jain",
-  "Buddhist",
-  "Other",
-  "Prefer not to say",
-];
-const educationLevels = [
-  "High School",
-  "Bachelor's",
-  "Master's",
-  "PhD",
-  "Other",
-];
-const professions = [
-  "Software Engineer",
-  "Doctor",
-  "Lawyer",
-  "Business Owner",
-  "Teacher",
-  "Designer",
-  "Marketing",
-  "Finance",
-  "Student",
-  "Other",
-];
-
-const states = [
-  "Andaman and Nicobar Islands",
-  "Andhra Pradesh",
-  "Arunachal Pradesh",
-  "Assam",
-  "Bihar",
-  "Chandigarh",
-  "Chhattisgarh",
-  "Dadra and Nagar Haveli and Daman and Diu",
-  "Delhi",
-  "Goa",
-  "Gujarat",
-  "Haryana",
-  "Himachal Pradesh",
-  "Jammu and Kashmir",
-  "Jharkhand",
-  "Karnataka",
-  "Kerala",
-  "Ladakh",
-  "Lakshadweep",
-  "Madhya Pradesh",
-  "Maharashtra",
-  "Manipur",
-  "Meghalaya",
-  "Mizoram",
-  "Nagaland",
-  "Odisha",
-  "Puducherry",
-  "Punjab",
-  "Rajasthan",
-  "Sikkim",
-  "Tamil Nadu",
-  "Telangana",
-  "Tripura",
-  "Uttar Pradesh",
-  "Uttarakhand",
-  "West Bengal",
 ];
 
 export type ProfileFormData = {
@@ -243,42 +170,28 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const [errors, setErrors] = useState<Record<string, string>>({});
   const [pendingPhotos, setPendingPhotos] = useState<Record<string, File>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form data
-  const [formData, setFormData] = useState<ProfileFormData>({
-    ...defaultFormData,
-    ...(initialData || {}),
-  });
-
-  const updateFormData = (field: string, value: string | string[]) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[field];
-        if (Object.keys(newErrors).length === 0 && submitError === "Please correct the highlighted fields.") {
-          setSubmitError("");
-        }
-        return newErrors;
-      });
-    }
-  };
-
-  const handleBlur = (field: string) => {
-    const error = validateProfileField(field, formData[field as keyof ProfileFormData] as string);
-    setErrors((prev) => {
-      const newErrors = { ...prev };
-      if (error) {
-        newErrors[field] = error;
-      } else {
-        delete newErrors[field];
+  const {
+    formData,
+    setFormData,
+    errors,
+    setErrors,
+    updateFormData,
+    handleBlur,
+  } = useProfileValidation<ProfileFormData>(
+    {
+      ...defaultFormData,
+      ...(initialData || {}),
+    },
+    () => {
+      if (submitError === "Please correct the highlighted fields.") {
+        setSubmitError("");
       }
-      return newErrors;
-    });
-  };
+    }
+  );
 
   const toggleInterest = (interest: string) => {
     setFormData((prev) => ({
@@ -579,62 +492,39 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
               {currentStep === 1 && (
                 <>
                   <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName">
-                        First Name <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        id="firstName"
-                        value={formData.firstName}
-                        onChange={(e) =>
-                          updateFormData("firstName", e.target.value)
-                        }
-                        onBlur={() => handleBlur("firstName")}
-                        aria-invalid={!!errors.firstName}
-                        className={errors.firstName ? "border-destructive focus-visible:ring-destructive" : ""}
-                        placeholder="Enter your first name"
-                      />
-                      {errors.firstName && <p className="text-sm text-destructive">{errors.firstName}</p>}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="lastName">
-                        Last Name <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        id="lastName"
-                        value={formData.lastName}
-                        onChange={(e) =>
-                          updateFormData("lastName", e.target.value)
-                        }
-                        onBlur={() => handleBlur("lastName")}
-                        aria-invalid={!!errors.lastName}
-                        className={errors.lastName ? "border-destructive focus-visible:ring-destructive" : ""}
-                        placeholder="Enter your last name"
-                      />
-                      {errors.lastName && <p className="text-sm text-destructive">{errors.lastName}</p>}
-                    </div>
+                    <ProfileInput
+                      id="firstName"
+                      label="First Name"
+                      requiredField
+                      value={formData.firstName}
+                      onChange={(e) => updateFormData("firstName", e.target.value)}
+                      onBlur={() => handleBlur("firstName")}
+                      error={errors.firstName}
+                      placeholder="Enter your first name"
+                    />
+                    <ProfileInput
+                      id="lastName"
+                      label="Last Name"
+                      requiredField
+                      value={formData.lastName}
+                      onChange={(e) => updateFormData("lastName", e.target.value)}
+                      onBlur={() => handleBlur("lastName")}
+                      error={errors.lastName}
+                      placeholder="Enter your last name"
+                    />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="dob">
-                      Date of Birth <span className="text-destructive">*</span>
-                    </Label>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="dob"
-                        type="date"
-                        value={formData.dateOfBirth}
-                        onChange={(e) =>
-                          updateFormData("dateOfBirth", e.target.value)
-                        }
-                        onBlur={() => handleBlur("dateOfBirth")}
-                        aria-invalid={!!errors.dateOfBirth}
-                        className={cn("pl-10", errors.dateOfBirth ? "border-destructive focus-visible:ring-destructive" : "")}
-                      />
-                    </div>
-                    {errors.dateOfBirth && <p className="text-sm text-destructive">{errors.dateOfBirth}</p>}
-                  </div>
+                  <ProfileInput
+                    id="dob"
+                    type="date"
+                    label="Date of Birth"
+                    requiredField
+                    icon={<Calendar className="h-4 w-4" />}
+                    value={formData.dateOfBirth}
+                    onChange={(e) => updateFormData("dateOfBirth", e.target.value)}
+                    onBlur={() => handleBlur("dateOfBirth")}
+                    error={errors.dateOfBirth}
+                  />
 
                   <div className="space-y-2">
                     <Label>
@@ -670,51 +560,27 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
                   </div>
 
                   <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="city">
-                        City <span className="text-destructive">*</span>
-                      </Label>
-                      <div className="relative">
-                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="city"
-                          value={formData.city}
-                          onChange={(e) =>
-                            updateFormData("city", e.target.value)
-                          }
-                          onBlur={() => handleBlur("city")}
-                          aria-invalid={!!errors.city}
-                          className={cn("pl-10", errors.city ? "border-destructive focus-visible:ring-destructive" : "")}
-                          placeholder="Enter your city"
-                        />
-                      </div>
-                      {errors.city && <p className="text-sm text-destructive">{errors.city}</p>}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="state">State</Label>
-                      <Select
-                        value={formData.state}
-                        onValueChange={(value) =>
-                          updateFormData("state", value)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select state" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {states.map((stateItem) => (
-                            <SelectItem
-                              key={stateItem}
-                              value={stateItem
-                                .toLowerCase()
-                                .replace(/\s+/g, "")}
-                            >
-                              {stateItem}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <ProfileInput
+                      id="city"
+                      label="City"
+                      requiredField
+                      icon={<MapPin className="h-4 w-4" />}
+                      value={formData.city}
+                      onChange={(e) => updateFormData("city", e.target.value)}
+                      onBlur={() => handleBlur("city")}
+                      error={errors.city}
+                      placeholder="Enter your city"
+                    />
+                    <ProfileSelect
+                      label="State"
+                      value={formData.state}
+                      onValueChange={(v) => updateFormData("state", v)}
+                      options={states.map(stateItem => ({
+                        label: stateItem,
+                        value: stateItem.toLowerCase().replace(/\s+/g, ""),
+                      }))}
+                      placeholder="Select state"
+                    />
                   </div>
                 </>
               )}
@@ -791,41 +657,21 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label>Preferred Religion</Label>
-                    <Select
-                      value={formData.preferredReligion}
-                      onValueChange={(value) =>
-                        updateFormData("preferredReligion", value)
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select religion" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {religions.map((religion) => (
-                          <SelectItem
-                            key={religion}
-                            value={religion.toLowerCase()}
-                          >
-                            {religion}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <ProfileSelect
+                    label="Preferred Religion"
+                    value={formData.preferredReligion}
+                    onValueChange={(v) => updateFormData("preferredReligion", v)}
+                    options={religions.map(r => ({ label: r, value: r.toLowerCase() }))}
+                    placeholder="Select religion"
+                  />
 
-                  <div className="space-y-2">
-                    <Label htmlFor="preferredCity">Preferred City</Label>
-                    <Input
-                      id="preferredCity"
-                      value={formData.preferredCity}
-                      onChange={(e) =>
-                        updateFormData("preferredCity", e.target.value)
-                      }
-                      placeholder="Enter preferred city (or leave blank for any)"
-                    />
-                  </div>
+                  <ProfileInput
+                    id="preferredCity"
+                    label="Preferred City"
+                    value={formData.preferredCity}
+                    onChange={(e) => updateFormData("preferredCity", e.target.value)}
+                    placeholder="Enter preferred city (or leave blank for any)"
+                  />
                 </>
               )}
 
@@ -900,170 +746,65 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
               {currentStep === 4 && (
                 <>
                   <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>
-                        <GraduationCap className="h-4 w-4 inline mr-2" />
-                        Education
-                      </Label>
-                      <Select
-                        value={formData.education}
-                        onValueChange={(value) =>
-                          updateFormData("education", value)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select education" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {educationLevels.map((level) => (
-                            <SelectItem key={level} value={level.toLowerCase()}>
-                              {level}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <ProfileSelect
+                      label={<><GraduationCap className="h-4 w-4 inline mr-2" />Education</>}
+                      value={formData.education}
+                      onValueChange={(v) => updateFormData("education", v)}
+                      options={educationLevels.map(level => ({ label: level, value: level.toLowerCase() }))}
+                      placeholder="Select education"
+                    />
 
-                    <div className="space-y-2">
-                      <Label>
-                        <Briefcase className="h-4 w-4 inline mr-2" />
-                        Profession
-                      </Label>
-                      <Select
-                        value={formData.profession}
-                        onValueChange={(value) =>
-                          updateFormData("profession", value)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select profession" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {professions.map((profession) => (
-                            <SelectItem
-                              key={profession}
-                              value={profession.toLowerCase()}
-                            >
-                              {profession}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <ProfileSelect
+                      label={<><Briefcase className="h-4 w-4 inline mr-2" />Profession</>}
+                      value={formData.profession}
+                      onValueChange={(v) => updateFormData("profession", v)}
+                      options={professions.map(profession => ({ label: profession, value: profession.toLowerCase() }))}
+                      placeholder="Select profession"
+                    />
                   </div>
 
                   <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Annual Income</Label>
-                      <Select
-                        value={formData.income}
-                        onValueChange={(value) =>
-                          updateFormData("income", value)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select income range" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="below5">Below ₹5 LPA</SelectItem>
-                          <SelectItem value="5-10">₹5-10 LPA</SelectItem>
-                          <SelectItem value="10-20">₹10-20 LPA</SelectItem>
-                          <SelectItem value="20-50">₹20-50 LPA</SelectItem>
-                          <SelectItem value="above50">Above ₹50 LPA</SelectItem>
-                          <SelectItem value="prefer-not">
-                            Prefer not to say
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <ProfileSelect
+                      label="Annual Income"
+                      value={formData.income}
+                      onValueChange={(v) => updateFormData("income", v)}
+                      options={incomeRanges}
+                      placeholder="Select income range"
+                    />
 
-                    <div className="space-y-2">
-                      <Label>
-                        <Home className="h-4 w-4 inline mr-2" />
-                        Family Type
-                      </Label>
-                      <Select
-                        value={formData.familyType}
-                        onValueChange={(value) =>
-                          updateFormData("familyType", value)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select family type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="nuclear">
-                            Nuclear Family
-                          </SelectItem>
-                          <SelectItem value="joint">Joint Family</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <ProfileSelect
+                      label={<><Home className="h-4 w-4 inline mr-2" />Family Type</>}
+                      value={formData.familyType}
+                      onValueChange={(v) => updateFormData("familyType", v)}
+                      options={familyTypes}
+                      placeholder="Select family type"
+                    />
                   </div>
 
                   <div className="grid sm:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label>Diet</Label>
-                      <Select
-                        value={formData.diet}
-                        onValueChange={(value) => updateFormData("diet", value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="vegetarian">Vegetarian</SelectItem>
-                          <SelectItem value="non-vegetarian">
-                            Non-Vegetarian
-                          </SelectItem>
-                          <SelectItem value="eggetarian">Eggetarian</SelectItem>
-                          <SelectItem value="vegan">Vegan</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <ProfileSelect
+                      label="Diet"
+                      value={formData.diet}
+                      onValueChange={(v) => updateFormData("diet", v)}
+                      options={dietOptions}
+                      placeholder="Select"
+                    />
 
-                    <div className="space-y-2">
-                      <Label>Drinking</Label>
-                      <Select
-                        value={formData.drinking}
-                        onValueChange={(value) =>
-                          updateFormData("drinking", value)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="never">Never</SelectItem>
-                          <SelectItem value="occasionally">
-                            Occasionally
-                          </SelectItem>
-                          <SelectItem value="socially">Socially</SelectItem>
-                          <SelectItem value="regularly">Regularly</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <ProfileSelect
+                      label="Drinking"
+                      value={formData.drinking}
+                      onValueChange={(v) => updateFormData("drinking", v)}
+                      options={drinkingOptions}
+                      placeholder="Select"
+                    />
 
-                    <div className="space-y-2">
-                      <Label>Smoking</Label>
-                      <Select
-                        value={formData.smoking}
-                        onValueChange={(value) =>
-                          updateFormData("smoking", value)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="never">Never</SelectItem>
-                          <SelectItem value="occasionally">
-                            Occasionally
-                          </SelectItem>
-                          <SelectItem value="regularly">Regularly</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <ProfileSelect
+                      label="Smoking"
+                      value={formData.smoking}
+                      onValueChange={(v) => updateFormData("smoking", v)}
+                      options={smokingOptions}
+                      placeholder="Select"
+                    />
                   </div>
                 </>
               )}

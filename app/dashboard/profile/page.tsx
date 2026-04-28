@@ -43,29 +43,26 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { validateProfileField, validateProfileForm } from "@/lib/validations";
 
-const interests = [
-  "Travel",
-  "Music",
-  "Reading",
-  "Fitness",
-  "Movies",
-  "Cooking",
-  "Photography",
-  "Art",
-  "Gaming",
-  "Sports",
-  "Dancing",
-  "Yoga",
-  "Tech",
-  "Fashion",
-  "Food",
-  "Nature",
-];
+import {
+  interests,
+  religions,
+  educationLevels,
+  professions,
+  incomeRanges,
+  familyTypes,
+  familyStatuses,
+  dietOptions,
+  drinkingOptions,
+  smokingOptions,
+  heightOptions,
+  maritalStatuses,
+} from "@/lib/profile-constants";
+import { useProfileValidation } from "@/hooks/use-profile-validation";
+import { ProfileInput, ProfileSelect } from "@/components/profile/profile-form-fields";
 
 export default function EditProfilePage() {
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [loadError, setLoadError] = useState<string>("");
-  const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -73,62 +70,49 @@ export default function EditProfilePage() {
 
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
 
-  const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    dateOfBirth: "",
-    gender: "",
-    city: "",
-    state: "",
-    religion: "",
-    motherTongue: "",
-    height: "",
-    maritalStatus: "",
-    education: "",
-    profession: "",
-    company: "",
-    income: "",
-    familyType: "",
-    familyStatus: "",
-    fatherOccupation: "",
-    motherOccupation: "",
-    siblings: "",
-    diet: "",
-    drinking: "",
-    smoking: "",
-    bio: "",
-    lookingFor: "",
-    showProfile: true,
-    showLastActive: true,
-    emailNotifications: true,
-  });
-
-  const updateFormData = (field: string, value: string | boolean) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[field];
-        if (Object.keys(newErrors).length === 0 && loadError === "Please correct the highlighted fields.") {
-          setLoadError("");
-        }
-        return newErrors;
-      });
-    }
-  };
-
-  const handleBlur = (field: string) => {
-    const error = validateProfileField(field, formData[field as keyof typeof formData] as string);
-    setErrors((prev) => {
-      const newErrors = { ...prev };
-      if (error) {
-        newErrors[field] = error;
-      } else {
-        delete newErrors[field];
+  const {
+    formData,
+    setFormData,
+    errors,
+    setErrors,
+    updateFormData,
+    handleBlur,
+  } = useProfileValidation(
+    {
+      firstName: "",
+      lastName: "",
+      dateOfBirth: "",
+      gender: "",
+      city: "",
+      state: "",
+      religion: "",
+      motherTongue: "",
+      height: "",
+      maritalStatus: "",
+      education: "",
+      profession: "",
+      company: "",
+      income: "",
+      familyType: "",
+      familyStatus: "",
+      fatherOccupation: "",
+      motherOccupation: "",
+      siblings: "",
+      diet: "",
+      drinking: "",
+      smoking: "",
+      bio: "",
+      lookingFor: "",
+      showProfile: true,
+      showLastActive: true,
+      emailNotifications: true,
+    },
+    () => {
+      if (loadError === "Please correct the highlighted fields.") {
+        setLoadError("");
       }
-      return newErrors;
-    });
-  };
+    }
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -478,191 +462,97 @@ export default function EditProfilePage() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName">
-                        First Name <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        id="firstName"
-                        value={formData.firstName}
-                        onChange={(e) => updateFormData("firstName", e.target.value)}
-                        onBlur={() => handleBlur("firstName")}
-                        aria-invalid={!!errors.firstName}
-                        className={errors.firstName ? "border-destructive focus-visible:ring-destructive" : ""}
-                      />
-                      {errors.firstName && <p className="text-sm text-destructive">{errors.firstName}</p>}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="lastName">
-                        Last Name <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        id="lastName"
-                        value={formData.lastName}
-                        onChange={(e) => updateFormData("lastName", e.target.value)}
-                        onBlur={() => handleBlur("lastName")}
-                        aria-invalid={!!errors.lastName}
-                        className={errors.lastName ? "border-destructive focus-visible:ring-destructive" : ""}
-                      />
-                      {errors.lastName && <p className="text-sm text-destructive">{errors.lastName}</p>}
-                    </div>
+                    <ProfileInput
+                      id="firstName"
+                      label="First Name"
+                      requiredField
+                      value={formData.firstName}
+                      onChange={(e) => updateFormData("firstName", e.target.value)}
+                      onBlur={() => handleBlur("firstName")}
+                      error={errors.firstName}
+                    />
+                    <ProfileInput
+                      id="lastName"
+                      label="Last Name"
+                      requiredField
+                      value={formData.lastName}
+                      onChange={(e) => updateFormData("lastName", e.target.value)}
+                      onBlur={() => handleBlur("lastName")}
+                      error={errors.lastName}
+                    />
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="dob">
-                        Date of Birth <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        id="dob"
-                        type="date"
-                        value={formData.dateOfBirth}
-                        onChange={(e) => updateFormData("dateOfBirth", e.target.value)}
-                        onBlur={() => handleBlur("dateOfBirth")}
-                        aria-invalid={!!errors.dateOfBirth}
-                        className={errors.dateOfBirth ? "border-destructive focus-visible:ring-destructive" : ""}
-                      />
-                      {errors.dateOfBirth && <p className="text-sm text-destructive">{errors.dateOfBirth}</p>}
-                    </div>
-                    <div className="space-y-2">
-                      <Label>
-                        Gender <span className="text-destructive">*</span>
-                      </Label>
-                      <Select
-                        value={formData.gender}
-                        onValueChange={(v) => updateFormData("gender", v)}
-                      >
-                        <SelectTrigger
-                          id="gender"
-                          className={errors.gender ? "border-destructive focus:ring-destructive" : ""}
-                          aria-invalid={!!errors.gender}
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="male">Male</SelectItem>
-                          <SelectItem value="female">Female</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {errors.gender && <p className="text-sm text-destructive">{errors.gender}</p>}
-                    </div>
+                    <ProfileInput
+                      id="dob"
+                      type="date"
+                      label="Date of Birth"
+                      requiredField
+                      value={formData.dateOfBirth}
+                      onChange={(e) => updateFormData("dateOfBirth", e.target.value)}
+                      onBlur={() => handleBlur("dateOfBirth")}
+                      error={errors.dateOfBirth}
+                    />
+                    <ProfileSelect
+                      id="gender"
+                      label="Gender"
+                      requiredField
+                      value={formData.gender}
+                      onValueChange={(v) => updateFormData("gender", v)}
+                      options={[
+                        { label: "Male", value: "male" },
+                        { label: "Female", value: "female" },
+                        { label: "Other", value: "other" },
+                      ]}
+                      error={errors.gender}
+                    />
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="city">
-                        City <span className="text-destructive">*</span>
-                      </Label>
-                      <div className="relative">
-                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="city"
-                          value={formData.city}
-                          onChange={(e) => updateFormData("city", e.target.value)}
-                          onBlur={() => handleBlur("city")}
-                          aria-invalid={!!errors.city}
-                          className={cn("pl-10", errors.city ? "border-destructive focus-visible:ring-destructive" : "")}
-                        />
-                      </div>
-                      {errors.city && <p className="text-sm text-destructive">{errors.city}</p>}
-                    </div>
-                    <div className="space-y-2">
-                      <Label>State</Label>
-                      <Select
-                        value={formData.state}
-                        onValueChange={(v) =>
-                          setFormData({ ...formData, state: v })
-                        }
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Maharashtra">
-                            Maharashtra
-                          </SelectItem>
-                          <SelectItem value="Delhi">Delhi</SelectItem>
-                          <SelectItem value="Karnataka">Karnataka</SelectItem>
-                          <SelectItem value="Tamil Nadu">Tamil Nadu</SelectItem>
-                          <SelectItem value="Telangana">Telangana</SelectItem>
-                          <SelectItem value="Gujarat">Gujarat</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <ProfileInput
+                      id="city"
+                      label="City"
+                      requiredField
+                      icon={<MapPin className="h-4 w-4" />}
+                      value={formData.city}
+                      onChange={(e) => updateFormData("city", e.target.value)}
+                      onBlur={() => handleBlur("city")}
+                      error={errors.city}
+                    />
+                    <ProfileSelect
+                      label="State"
+                      value={formData.state}
+                      onValueChange={(v) => updateFormData("state", v)}
+                      options={[
+                        "Maharashtra",
+                        "Delhi",
+                        "Karnataka",
+                        "Tamil Nadu",
+                        "Telangana",
+                        "Gujarat",
+                      ]}
+                    />
                   </div>
 
                   <div className="grid md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label>Religion</Label>
-                      <Select
-                        value={formData.religion}
-                        onValueChange={(v) =>
-                          setFormData({ ...formData, religion: v })
-                        }
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="hindu">Hindu</SelectItem>
-                          <SelectItem value="muslim">Muslim</SelectItem>
-                          <SelectItem value="christian">Christian</SelectItem>
-                          <SelectItem value="sikh">Sikh</SelectItem>
-                          <SelectItem value="jain">Jain</SelectItem>
-                          <SelectItem value="buddhist">Buddhist</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Height</Label>
-                      <Select
-                        value={formData.height}
-                        onValueChange={(v) =>
-                          setFormData({ ...formData, height: v })
-                        }
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {[
-                            "5'0\"",
-                            "5'2\"",
-                            "5'4\"",
-                            "5'6\"",
-                            "5'8\"",
-                            "5'10\"",
-                            "6'0\"",
-                            "6'2\"",
-                          ].map((h) => (
-                            <SelectItem key={h} value={h}>
-                              {h}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Marital Status</Label>
-                      <Select
-                        value={formData.maritalStatus}
-                        onValueChange={(v) =>
-                          setFormData({ ...formData, maritalStatus: v })
-                        }
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="never-married">
-                            Never Married
-                          </SelectItem>
-                          <SelectItem value="divorced">Divorced</SelectItem>
-                          <SelectItem value="widowed">Widowed</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <ProfileSelect
+                      label="Religion"
+                      value={formData.religion}
+                      onValueChange={(v) => updateFormData("religion", v)}
+                      options={religions.filter(r => r !== "Other" && r !== "Prefer not to say").map(r => ({ label: r, value: r.toLowerCase() }))}
+                    />
+                    <ProfileSelect
+                      label="Height"
+                      value={formData.height}
+                      onValueChange={(v) => updateFormData("height", v)}
+                      options={heightOptions}
+                    />
+                    <ProfileSelect
+                      label="Marital Status"
+                      value={formData.maritalStatus}
+                      onValueChange={(v) => updateFormData("maritalStatus", v)}
+                      options={maritalStatuses}
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -756,93 +646,48 @@ export default function EditProfilePage() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Highest Education</Label>
-                      <Select
-                        value={formData.education}
-                        onValueChange={(v) =>
-                          setFormData({ ...formData, education: v })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="high-school">
-                            High School
-                          </SelectItem>
-                          <SelectItem value="bachelor">
-                            Bachelor&apos;s
-                          </SelectItem>
-                          <SelectItem value="master">Master&apos;s</SelectItem>
-                          <SelectItem value="phd">PhD</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Profession</Label>
-                      <Select
-                        value={formData.profession}
-                        onValueChange={(v) =>
-                          setFormData({ ...formData, profession: v })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="software-engineer">
-                            Software Engineer
-                          </SelectItem>
-                          <SelectItem value="doctor">Doctor</SelectItem>
-                          <SelectItem value="lawyer">Lawyer</SelectItem>
-                          <SelectItem value="business-owner">
-                            Business Owner
-                          </SelectItem>
-                          <SelectItem value="teacher">Teacher</SelectItem>
-                          <SelectItem value="designer">Designer</SelectItem>
-                          <SelectItem value="marketing">Marketing</SelectItem>
-                          <SelectItem value="finance">Finance</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <ProfileSelect
+                      label="Highest Education"
+                      value={formData.education}
+                      onValueChange={(v) => updateFormData("education", v)}
+                      options={[
+                        { label: "High School", value: "high-school" },
+                        { label: "Bachelor's", value: "bachelor" },
+                        { label: "Master's", value: "master" },
+                        { label: "PhD", value: "phd" },
+                      ]}
+                    />
+                    <ProfileSelect
+                      label="Profession"
+                      value={formData.profession}
+                      onValueChange={(v) => updateFormData("profession", v)}
+                      options={[
+                        { label: "Software Engineer", value: "software-engineer" },
+                        { label: "Doctor", value: "doctor" },
+                        { label: "Lawyer", value: "lawyer" },
+                        { label: "Business Owner", value: "business-owner" },
+                        { label: "Teacher", value: "teacher" },
+                        { label: "Designer", value: "designer" },
+                        { label: "Marketing", value: "marketing" },
+                        { label: "Finance", value: "finance" },
+                      ]}
+                    />
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="company">Company/Organization</Label>
-                      <Input
-                        id="company"
-                        value={formData.company}
-                        onChange={(e) =>
-                          setFormData({ ...formData, company: e.target.value })
-                        }
-                        placeholder="Where do you work?"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Annual Income</Label>
-                      <Select
-                        value={formData.income}
-                        onValueChange={(v) =>
-                          setFormData({ ...formData, income: v })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="below5">Below ₹5 LPA</SelectItem>
-                          <SelectItem value="5-10">₹5-10 LPA</SelectItem>
-                          <SelectItem value="10-20">₹10-20 LPA</SelectItem>
-                          <SelectItem value="20-50">₹20-50 LPA</SelectItem>
-                          <SelectItem value="above50">Above ₹50 LPA</SelectItem>
-                          <SelectItem value="prefer-not">
-                            Prefer not to say
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <ProfileInput
+                      id="company"
+                      label="Company/Organization"
+                      value={formData.company}
+                      onChange={(e) => updateFormData("company", e.target.value)}
+                      placeholder="Where do you work?"
+                    />
+                    <ProfileSelect
+                      label="Annual Income"
+                      value={formData.income}
+                      onValueChange={(v) => updateFormData("income", v)}
+                      options={incomeRanges}
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -860,157 +705,64 @@ export default function EditProfilePage() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Family Type</Label>
-                      <Select
-                        value={formData.familyType}
-                        onValueChange={(v) =>
-                          setFormData({ ...formData, familyType: v })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="nuclear">
-                            Nuclear Family
-                          </SelectItem>
-                          <SelectItem value="joint">Joint Family</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Family Status</Label>
-                      <Select
-                        value={formData.familyStatus}
-                        onValueChange={(v) =>
-                          setFormData({ ...formData, familyStatus: v })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="middle">Middle Class</SelectItem>
-                          <SelectItem value="upper-middle">
-                            Upper Middle Class
-                          </SelectItem>
-                          <SelectItem value="affluent">Affluent</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <ProfileSelect
+                      label="Family Type"
+                      value={formData.familyType}
+                      onValueChange={(v) => updateFormData("familyType", v)}
+                      options={familyTypes}
+                    />
+                    <ProfileSelect
+                      label="Family Status"
+                      value={formData.familyStatus}
+                      onValueChange={(v) => updateFormData("familyStatus", v)}
+                      options={familyStatuses}
+                    />
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="fatherOccupation">
-                        Father&apos;s Occupation
-                      </Label>
-                      <Input
-                        id="fatherOccupation"
-                        value={formData.fatherOccupation}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            fatherOccupation: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="motherOccupation">
-                        Mother&apos;s Occupation
-                      </Label>
-                      <Input
-                        id="motherOccupation"
-                        value={formData.motherOccupation}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            motherOccupation: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="siblings">Siblings</Label>
-                    <Input
-                      id="siblings"
-                      value={formData.siblings}
-                      onChange={(e) =>
-                        setFormData({ ...formData, siblings: e.target.value })
-                      }
-                      placeholder="e.g., 1 Brother (Married), 1 Sister (Unmarried)"
+                    <ProfileInput
+                      id="fatherOccupation"
+                      label="Father's Occupation"
+                      value={formData.fatherOccupation}
+                      onChange={(e) => updateFormData("fatherOccupation", e.target.value)}
+                    />
+                    <ProfileInput
+                      id="motherOccupation"
+                      label="Mother's Occupation"
+                      value={formData.motherOccupation}
+                      onChange={(e) => updateFormData("motherOccupation", e.target.value)}
                     />
                   </div>
+
+                  <ProfileInput
+                    id="siblings"
+                    label="Siblings"
+                    value={formData.siblings}
+                    onChange={(e) => updateFormData("siblings", e.target.value)}
+                    placeholder="e.g., 1 Brother (Married), 1 Sister (Unmarried)"
+                  />
 
                   <Separator />
 
                   <div className="grid md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label>Diet</Label>
-                      <Select
-                        value={formData.diet}
-                        onValueChange={(v) =>
-                          setFormData({ ...formData, diet: v })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="vegetarian">Vegetarian</SelectItem>
-                          <SelectItem value="non-vegetarian">
-                            Non-Vegetarian
-                          </SelectItem>
-                          <SelectItem value="eggetarian">Eggetarian</SelectItem>
-                          <SelectItem value="vegan">Vegan</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Drinking</Label>
-                      <Select
-                        value={formData.drinking}
-                        onValueChange={(v) =>
-                          setFormData({ ...formData, drinking: v })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="never">Never</SelectItem>
-                          <SelectItem value="occasionally">
-                            Occasionally
-                          </SelectItem>
-                          <SelectItem value="socially">Socially</SelectItem>
-                          <SelectItem value="regularly">Regularly</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Smoking</Label>
-                      <Select
-                        value={formData.smoking}
-                        onValueChange={(v) =>
-                          setFormData({ ...formData, smoking: v })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="never">Never</SelectItem>
-                          <SelectItem value="occasionally">
-                            Occasionally
-                          </SelectItem>
-                          <SelectItem value="regularly">Regularly</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <ProfileSelect
+                      label="Diet"
+                      value={formData.diet}
+                      onValueChange={(v) => updateFormData("diet", v)}
+                      options={dietOptions}
+                    />
+                    <ProfileSelect
+                      label="Drinking"
+                      value={formData.drinking}
+                      onValueChange={(v) => updateFormData("drinking", v)}
+                      options={drinkingOptions}
+                    />
+                    <ProfileSelect
+                      label="Smoking"
+                      value={formData.smoking}
+                      onValueChange={(v) => updateFormData("smoking", v)}
+                      options={smokingOptions}
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -1035,9 +787,7 @@ export default function EditProfilePage() {
                       <Textarea
                         id="bio"
                         value={formData.bio}
-                        onChange={(e) =>
-                          setFormData({ ...formData, bio: e.target.value })
-                        }
+                        onChange={(e) => updateFormData("bio", e.target.value)}
                         rows={5}
                         className="resize-none"
                         placeholder="Write about yourself, your values, and what makes you unique..."
@@ -1052,12 +802,7 @@ export default function EditProfilePage() {
                       <Textarea
                         id="lookingFor"
                         value={formData.lookingFor}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            lookingFor: e.target.value,
-                          })
-                        }
+                        onChange={(e) => updateFormData("lookingFor", e.target.value)}
                         rows={4}
                         className="resize-none"
                         placeholder="Describe what you're looking for in a life partner..."
@@ -1118,9 +863,7 @@ export default function EditProfilePage() {
                       </div>
                       <Switch
                         checked={formData.showProfile}
-                        onCheckedChange={(checked) =>
-                          setFormData({ ...formData, showProfile: checked })
-                        }
+                        onCheckedChange={(checked) => updateFormData("showProfile", checked)}
                       />
                     </div>
                     <Separator />
@@ -1133,9 +876,7 @@ export default function EditProfilePage() {
                       </div>
                       <Switch
                         checked={formData.showLastActive}
-                        onCheckedChange={(checked) =>
-                          setFormData({ ...formData, showLastActive: checked })
-                        }
+                        onCheckedChange={(checked) => updateFormData("showLastActive", checked)}
                       />
                     </div>
                     <Separator />
@@ -1148,12 +889,7 @@ export default function EditProfilePage() {
                       </div>
                       <Switch
                         checked={formData.emailNotifications}
-                        onCheckedChange={(checked) =>
-                          setFormData({
-                            ...formData,
-                            emailNotifications: checked,
-                          })
-                        }
+                        onCheckedChange={(checked) => updateFormData("emailNotifications", checked)}
                       />
                     </div>
                   </CardContent>
