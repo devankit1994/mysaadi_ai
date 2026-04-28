@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
 import {
   Card,
@@ -41,6 +41,11 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import {
+  validateImageFile,
+  uploadPhotoToSupabase,
+  setupFilePickerFocusListener,
+} from "@/lib/upload-utils";
 
 const interests = [
   "Travel",
@@ -180,11 +185,57 @@ export default function EditProfilePage() {
     );
   };
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+  const [selectingIndex, setSelectingIndex] = useState<number | null>(null);
+  const targetIndexRef = useRef<number | null>(null);
+
   const handlePhotoUpload = (index: number) => {
-    const newPhotos = [...photos];
-    newPhotos[index] =
-      `/placeholder.svg?height=300&width=300&query=person portrait ${index + 1}`;
-    setPhotos(newPhotos);
+    targetIndexRef.current = index;
+    setSelectingIndex(index);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+      
+      setupFilePickerFocusListener(() => {
+        setSelectingIndex(null);
+      });
+      
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectingIndex(null);
+    const file = event.target.files?.[0];
+    const index = targetIndexRef.current;
+    if (!file || index === null) return;
+
+    const validation = validateImageFile(file);
+    if (!validation.isValid) {
+      alert(validation.error);
+      return;
+    }
+
+    setUploadingIndex(index);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No user found");
+
+      const publicUrl = await uploadPhotoToSupabase(file, user.id);
+
+      const newPhotos = [...photos];
+      newPhotos[index as number] = publicUrl;
+      setPhotos(newPhotos);
+    } catch (error) {
+      console.error("Error uploading photo:", error);
+      alert("Failed to upload photo. Please try again.");
+    } finally {
+      setUploadingIndex(null);
+      targetIndexRef.current = null;
+      if (event.target) {
+        event.target.value = "";
+      }
+    }
   };
 
   const removePhoto = (index: number) => {
@@ -648,15 +699,33 @@ export default function EditProfilePage() {
                         ) : (
                           <button
                             onClick={() => handlePhotoUpload(index)}
-                            className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary hover:border-primary transition-colors"
+                            disabled={uploadingIndex === index || selectingIndex === index}
+                            className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary hover:border-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            <Upload className="h-8 w-8" />
-                            <span className="text-sm">Add Photo</span>
+                            {uploadingIndex === index || selectingIndex === index ? (
+                              <>
+                                <Loader2 className="h-8 w-8 animate-spin" />
+                                <span className="text-sm">Uploading...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="h-8 w-8" />
+                                <span className="text-sm">Add Photo</span>
+                              </>
+                            )}
                           </button>
                         )}
                       </div>
                     ))}
                   </div>
+
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                  />
 
                   <div className="mt-6 p-4 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-3">
                     <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />

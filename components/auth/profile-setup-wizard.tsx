@@ -45,6 +45,11 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import {
+  validateImageFile,
+  uploadPhotoToSupabase,
+  setupFilePickerFocusListener,
+} from "@/lib/upload-utils";
 
 const steps = [
   { id: 1, title: "Basic Info", icon: User },
@@ -241,6 +246,7 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSelectingFile, setIsSelectingFile] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [pendingPhotos, setPendingPhotos] = useState<Record<string, File>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -265,15 +271,26 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
   };
 
   const handlePhotoUpload = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    
+    setupFilePickerFocusListener(() => {
+      setIsSelectingFile(false);
+    });
+    
+    setIsSelectingFile(true);
     fileInputRef.current?.click();
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setIsSelectingFile(false);
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert("File size should be less than 5MB");
+    const validation = validateImageFile(file);
+    if (!validation.isValid) {
+      alert(validation.error);
       return;
     }
 
@@ -325,18 +342,7 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
             if (!newPhotos.includes(url)) continue;
 
             const file = pendingPhotos[url];
-            const fileExt = file.name.split(".").pop();
-            const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-            const { error: uploadError } = await supabase.storage
-              .from("photos")
-              .upload(fileName, file);
-
-            if (uploadError) throw uploadError;
-
-            const {
-              data: { publicUrl },
-            } = supabase.storage.from("photos").getPublicUrl(fileName);
+            const publicUrl = await uploadPhotoToSupabase(file, user.id);
 
             // Replace the blob URL with the actual Supabase URL
             const index = newPhotos.indexOf(url);
@@ -777,16 +783,16 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
                     {allowPhotoUpload && formData.photos.length < 6 && (
                       <button
                         onClick={handlePhotoUpload}
-                        disabled={isUploading}
+                        disabled={isUploading || isSelectingFile}
                         className="aspect-square rounded-xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {isUploading ? (
+                        {isUploading || isSelectingFile ? (
                           <Loader2 className="h-8 w-8 animate-spin" />
                         ) : (
                           <Upload className="h-8 w-8" />
                         )}
                         <span className="text-sm">
-                          {isUploading ? "Uploading..." : "Add Photo"}
+                          {isUploading || isSelectingFile ? "Uploading..." : "Add Photo"}
                         </span>
                       </button>
                     )}
