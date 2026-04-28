@@ -45,9 +45,11 @@ import { validateProfileField, validateProfileForm } from "@/lib/validations";
 
 import {
   interests,
+  genderOptions,
   religions,
   educationLevels,
   professions,
+  states,
   incomeRanges,
   familyTypes,
   familyStatuses,
@@ -499,11 +501,7 @@ export default function EditProfilePage() {
                       requiredField
                       value={formData.gender}
                       onValueChange={(v) => updateFormData("gender", v)}
-                      options={[
-                        { label: "Male", value: "male" },
-                        { label: "Female", value: "female" },
-                        { label: "Other", value: "other" },
-                      ]}
+                      options={genderOptions}
                       error={errors.gender}
                     />
                   </div>
@@ -523,14 +521,7 @@ export default function EditProfilePage() {
                       label="State"
                       value={formData.state}
                       onValueChange={(v) => updateFormData("state", v)}
-                      options={[
-                        "Maharashtra",
-                        "Delhi",
-                        "Karnataka",
-                        "Tamil Nadu",
-                        "Telangana",
-                        "Gujarat",
-                      ]}
+                      options={states}
                     />
                   </div>
 
@@ -539,7 +530,7 @@ export default function EditProfilePage() {
                       label="Religion"
                       value={formData.religion}
                       onValueChange={(v) => updateFormData("religion", v)}
-                      options={religions.filter(r => r !== "Other" && r !== "Prefer not to say").map(r => ({ label: r, value: r.toLowerCase() }))}
+                      options={religions.filter(r => r.value !== "other" && r.value !== "prefer-not")}
                     />
                     <ProfileSelect
                       label="Height"
@@ -650,27 +641,13 @@ export default function EditProfilePage() {
                       label="Highest Education"
                       value={formData.education}
                       onValueChange={(v) => updateFormData("education", v)}
-                      options={[
-                        { label: "High School", value: "high-school" },
-                        { label: "Bachelor's", value: "bachelor" },
-                        { label: "Master's", value: "master" },
-                        { label: "PhD", value: "phd" },
-                      ]}
+                      options={educationLevels}
                     />
                     <ProfileSelect
                       label="Profession"
                       value={formData.profession}
                       onValueChange={(v) => updateFormData("profession", v)}
-                      options={[
-                        { label: "Software Engineer", value: "software-engineer" },
-                        { label: "Doctor", value: "doctor" },
-                        { label: "Lawyer", value: "lawyer" },
-                        { label: "Business Owner", value: "business-owner" },
-                        { label: "Teacher", value: "teacher" },
-                        { label: "Designer", value: "designer" },
-                        { label: "Marketing", value: "marketing" },
-                        { label: "Finance", value: "finance" },
-                      ]}
+                      options={professions}
                     />
                   </div>
 

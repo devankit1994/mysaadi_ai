@@ -575,10 +575,7 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
                       label="State"
                       value={formData.state}
                       onValueChange={(v) => updateFormData("state", v)}
-                      options={states.map(stateItem => ({
-                        label: stateItem,
-                        value: stateItem.toLowerCase().replace(/\s+/g, ""),
-                      }))}
+                      options={states}
                       placeholder="Select state"
                     />
                   </div>
@@ -661,7 +658,7 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
                     label="Preferred Religion"
                     value={formData.preferredReligion}
                     onValueChange={(v) => updateFormData("preferredReligion", v)}
-                    options={religions.map(r => ({ label: r, value: r.toLowerCase() }))}
+                    options={religions}
                     placeholder="Select religion"
                   />
 
@@ -750,7 +747,7 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
                       label={<><GraduationCap className="h-4 w-4 inline mr-2" />Education</>}
                       value={formData.education}
                       onValueChange={(v) => updateFormData("education", v)}
-                      options={educationLevels.map(level => ({ label: level, value: level.toLowerCase() }))}
+                      options={educationLevels}
                       placeholder="Select education"
                     />
 
@@ -758,7 +755,7 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
                       label={<><Briefcase className="h-4 w-4 inline mr-2" />Profession</>}
                       value={formData.profession}
                       onValueChange={(v) => updateFormData("profession", v)}
-                      options={professions.map(profession => ({ label: profession, value: profession.toLowerCase() }))}
+                      options={professions}
                       placeholder="Select profession"
                     />
                   </div>
@@ -930,10 +927,8 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
                         <p className="text-sm text-muted-foreground">
                           {formData.city || "City"},{" "}
                           {states.find(
-                            (s) =>
-                              s.toLowerCase().replace(/\s+/g, "") ===
-                              formData.state,
-                          ) ||
+                            (s) => s.value === formData.state,
+                          )?.label ||
                             formData.state ||
                             "State"}
                         </p>

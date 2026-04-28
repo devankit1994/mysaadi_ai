@@ -17,36 +17,42 @@ export const interests = [
   "Nature",
 ];
 
+export const genderOptions = [
+  { label: "Male", value: "male" },
+  { label: "Female", value: "female" },
+  { label: "Other", value: "other" },
+];
+
 export const religions = [
-  "Hindu",
-  "Muslim",
-  "Christian",
-  "Sikh",
-  "Jain",
-  "Buddhist",
-  "Other",
-  "Prefer not to say",
+  { label: "Hindu", value: "hindu" },
+  { label: "Muslim", value: "muslim" },
+  { label: "Christian", value: "christian" },
+  { label: "Sikh", value: "sikh" },
+  { label: "Jain", value: "jain" },
+  { label: "Buddhist", value: "buddhist" },
+  { label: "Other", value: "other" },
+  { label: "Prefer not to say", value: "prefer-not" },
 ];
 
 export const educationLevels = [
-  "High School",
-  "Bachelor's",
-  "Master's",
-  "PhD",
-  "Other",
+  { label: "High School", value: "high-school" },
+  { label: "Bachelor's", value: "bachelor" },
+  { label: "Master's", value: "master" },
+  { label: "PhD", value: "phd" },
+  { label: "Other", value: "other" },
 ];
 
 export const professions = [
-  "Software Engineer",
-  "Doctor",
-  "Lawyer",
-  "Business Owner",
-  "Teacher",
-  "Designer",
-  "Marketing",
-  "Finance",
-  "Student",
-  "Other",
+  { label: "Software Engineer", value: "software-engineer" },
+  { label: "Doctor", value: "doctor" },
+  { label: "Lawyer", value: "lawyer" },
+  { label: "Business Owner", value: "business-owner" },
+  { label: "Teacher", value: "teacher" },
+  { label: "Designer", value: "designer" },
+  { label: "Marketing", value: "marketing" },
+  { label: "Finance", value: "finance" },
+  { label: "Student", value: "student" },
+  { label: "Other", value: "other" },
 ];
 
 export const states = [
@@ -86,7 +92,7 @@ export const states = [
   "Uttar Pradesh",
   "Uttarakhand",
   "West Bengal",
-];
+].map((s) => ({ label: s, value: s }));
 
 export const incomeRanges = [
   { value: "below5", label: "Below ₹5 LPA" },

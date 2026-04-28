@@ -55,7 +55,7 @@ export function ProfileInput({
   );
 }
 
-export interface ProfileSelectProps {
+export interface ProfileSelectProps extends Omit<React.ComponentProps<typeof Select>, "value" | "onValueChange"> {
   label: ReactNode;
   value: string;
   onValueChange: (value: string) => void;
@@ -77,13 +77,14 @@ export function ProfileSelect({
   placeholder,
   containerClassName,
   id,
+  ...props
 }: ProfileSelectProps) {
   return (
     <div className={cn("space-y-2", containerClassName)}>
       <Label htmlFor={id}>
         {label} {requiredField && <span className="text-destructive">*</span>}
       </Label>
-      <Select value={value} onValueChange={onValueChange}>
+      <Select value={value} onValueChange={onValueChange} {...props}>
         <SelectTrigger
           id={id}
           className={cn(error && "border-destructive focus:ring-destructive")}

@@ -8,7 +8,7 @@ export function useProfileValidation<T extends Record<string, any>>(
   const [formData, setFormData] = useState<T>(initialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const updateFormData = (field: keyof T, value: any) => {
+  const updateFormData = <K extends keyof T>(field: K, value: T[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     const fieldKey = field as string;
     
