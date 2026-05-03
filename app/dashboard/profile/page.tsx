@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
 import {
   Card,
@@ -42,6 +42,11 @@ import {
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { validateProfileField, validateProfileForm } from "@/lib/validations";
+import {
+  validateImageFile,
+  uploadPhotoToSupabase,
+  setupFilePickerFocusListener,
+} from "@/lib/upload-utils";
 
 import {
   interests,
@@ -60,7 +65,10 @@ import {
   maritalStatuses,
 } from "@/lib/profile-constants";
 import { useProfileValidation } from "@/hooks/use-profile-validation";
-import { ProfileInput, ProfileSelect } from "@/components/profile/profile-form-fields";
+import {
+  ProfileInput,
+  ProfileSelect,
+} from "@/components/profile/profile-form-fields";
 
 export default function EditProfilePage() {
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
@@ -113,7 +121,7 @@ export default function EditProfilePage() {
       if (loadError === "Please correct the highlighted fields.") {
         setLoadError("");
       }
-    }
+    },
   );
 
   useEffect(() => {
@@ -195,11 +203,61 @@ export default function EditProfilePage() {
     );
   };
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+  const [selectingIndex, setSelectingIndex] = useState<number | null>(null);
+  const targetIndexRef = useRef<number | null>(null);
+
   const handlePhotoUpload = (index: number) => {
-    const newPhotos = [...photos];
-    newPhotos[index] =
-      `/placeholder.svg?height=300&width=300&query=person portrait ${index + 1}`;
-    setPhotos(newPhotos);
+    targetIndexRef.current = index;
+    setSelectingIndex(index);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+
+      setupFilePickerFocusListener(() => {
+        setSelectingIndex(null);
+      });
+
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    setSelectingIndex(null);
+    const file = event.target.files?.[0];
+    const index = targetIndexRef.current;
+    if (!file || index === null) return;
+
+    const validation = validateImageFile(file);
+    if (!validation.isValid) {
+      alert(validation.error);
+      return;
+    }
+
+    setUploadingIndex(index);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("No user found");
+
+      const publicUrl = await uploadPhotoToSupabase(file, user.id);
+
+      const newPhotos = [...photos];
+      newPhotos[index as number] = publicUrl;
+      setPhotos(newPhotos);
+    } catch (error) {
+      console.error("Error uploading photo:", error);
+      alert("Failed to upload photo. Please try again.");
+    } finally {
+      setUploadingIndex(null);
+      targetIndexRef.current = null;
+      if (event.target) {
+        event.target.value = "";
+      }
+    }
   };
 
   const removePhoto = (index: number) => {
@@ -213,11 +271,12 @@ export default function EditProfilePage() {
     if (formErrors) {
       setErrors(formErrors);
       setLoadError("Please correct the highlighted fields.");
-      
+
       const firstErrorField = Object.keys(formErrors)[0];
-      const elementId = firstErrorField === "dateOfBirth" ? "dob" : firstErrorField;
+      const elementId =
+        firstErrorField === "dateOfBirth" ? "dob" : firstErrorField;
       const element = document.getElementById(elementId);
-      
+
       // We also might need to ensure the correct tab is selected, but for now we'll just focus.
       if (element) {
         element.focus();
@@ -367,8 +426,8 @@ export default function EditProfilePage() {
           <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
           <div className="text-sm text-destructive">
             <p className="font-medium">
-              {loadError === "Please correct the highlighted fields." 
-                ? "Please correct the highlighted fields." 
+              {loadError === "Please correct the highlighted fields."
+                ? "Please correct the highlighted fields."
                 : "Something went wrong"}
             </p>
             {loadError !== "Please correct the highlighted fields." && (
@@ -469,7 +528,9 @@ export default function EditProfilePage() {
                       label="First Name"
                       requiredField
                       value={formData.firstName}
-                      onChange={(e) => updateFormData("firstName", e.target.value)}
+                      onChange={(e) =>
+                        updateFormData("firstName", e.target.value)
+                      }
                       onBlur={() => handleBlur("firstName")}
                       error={errors.firstName}
                     />
@@ -478,7 +539,9 @@ export default function EditProfilePage() {
                       label="Last Name"
                       requiredField
                       value={formData.lastName}
-                      onChange={(e) => updateFormData("lastName", e.target.value)}
+                      onChange={(e) =>
+                        updateFormData("lastName", e.target.value)
+                      }
                       onBlur={() => handleBlur("lastName")}
                       error={errors.lastName}
                     />
@@ -491,7 +554,9 @@ export default function EditProfilePage() {
                       label="Date of Birth"
                       requiredField
                       value={formData.dateOfBirth}
-                      onChange={(e) => updateFormData("dateOfBirth", e.target.value)}
+                      onChange={(e) =>
+                        updateFormData("dateOfBirth", e.target.value)
+                      }
                       onBlur={() => handleBlur("dateOfBirth")}
                       error={errors.dateOfBirth}
                     />
@@ -530,7 +595,9 @@ export default function EditProfilePage() {
                       label="Religion"
                       value={formData.religion}
                       onValueChange={(v) => updateFormData("religion", v)}
-                      options={religions.filter(r => r.value !== "other" && r.value !== "prefer-not")}
+                      options={religions.filter(
+                        (r) => r.value !== "other" && r.value !== "prefer-not",
+                      )}
                     />
                     <ProfileSelect
                       label="Height"
@@ -597,15 +664,37 @@ export default function EditProfilePage() {
                         ) : (
                           <button
                             onClick={() => handlePhotoUpload(index)}
-                            className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary hover:border-primary transition-colors"
+                            disabled={
+                              uploadingIndex === index ||
+                              selectingIndex === index
+                            }
+                            className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary hover:border-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            <Upload className="h-8 w-8" />
-                            <span className="text-sm">Add Photo</span>
+                            {uploadingIndex === index ||
+                            selectingIndex === index ? (
+                              <>
+                                <Loader2 className="h-8 w-8 animate-spin" />
+                                <span className="text-sm">Uploading...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="h-8 w-8" />
+                                <span className="text-sm">Add Photo</span>
+                              </>
+                            )}
                           </button>
                         )}
                       </div>
                     ))}
                   </div>
+
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                  />
 
                   <div className="mt-6 p-4 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-3">
                     <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
@@ -656,7 +745,9 @@ export default function EditProfilePage() {
                       id="company"
                       label="Company/Organization"
                       value={formData.company}
-                      onChange={(e) => updateFormData("company", e.target.value)}
+                      onChange={(e) =>
+                        updateFormData("company", e.target.value)
+                      }
                       placeholder="Where do you work?"
                     />
                     <ProfileSelect
@@ -701,13 +792,17 @@ export default function EditProfilePage() {
                       id="fatherOccupation"
                       label="Father's Occupation"
                       value={formData.fatherOccupation}
-                      onChange={(e) => updateFormData("fatherOccupation", e.target.value)}
+                      onChange={(e) =>
+                        updateFormData("fatherOccupation", e.target.value)
+                      }
                     />
                     <ProfileInput
                       id="motherOccupation"
                       label="Mother's Occupation"
                       value={formData.motherOccupation}
-                      onChange={(e) => updateFormData("motherOccupation", e.target.value)}
+                      onChange={(e) =>
+                        updateFormData("motherOccupation", e.target.value)
+                      }
                     />
                   </div>
 
@@ -779,7 +874,9 @@ export default function EditProfilePage() {
                       <Textarea
                         id="lookingFor"
                         value={formData.lookingFor}
-                        onChange={(e) => updateFormData("lookingFor", e.target.value)}
+                        onChange={(e) =>
+                          updateFormData("lookingFor", e.target.value)
+                        }
                         rows={4}
                         className="resize-none"
                         placeholder="Describe what you're looking for in a life partner..."
@@ -840,7 +937,9 @@ export default function EditProfilePage() {
                       </div>
                       <Switch
                         checked={formData.showProfile}
-                        onCheckedChange={(checked) => updateFormData("showProfile", checked)}
+                        onCheckedChange={(checked) =>
+                          updateFormData("showProfile", checked)
+                        }
                       />
                     </div>
                     <Separator />
@@ -853,7 +952,9 @@ export default function EditProfilePage() {
                       </div>
                       <Switch
                         checked={formData.showLastActive}
-                        onCheckedChange={(checked) => updateFormData("showLastActive", checked)}
+                        onCheckedChange={(checked) =>
+                          updateFormData("showLastActive", checked)
+                        }
                       />
                     </div>
                     <Separator />
@@ -866,7 +967,9 @@ export default function EditProfilePage() {
                       </div>
                       <Switch
                         checked={formData.emailNotifications}
-                        onCheckedChange={(checked) => updateFormData("emailNotifications", checked)}
+                        onCheckedChange={(checked) =>
+                          updateFormData("emailNotifications", checked)
+                        }
                       />
                     </div>
                   </CardContent>

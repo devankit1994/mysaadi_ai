@@ -60,7 +60,15 @@ import {
   smokingOptions,
 } from "@/lib/profile-constants";
 import { useProfileValidation } from "@/hooks/use-profile-validation";
-import { ProfileInput, ProfileSelect } from "@/components/profile/profile-form-fields";
+import {
+  ProfileInput,
+  ProfileSelect,
+} from "@/components/profile/profile-form-fields";
+import {
+  validateImageFile,
+  uploadPhotoToSupabase,
+  setupFilePickerFocusListener,
+} from "@/lib/upload-utils";
 
 const steps = [
   { id: 1, title: "Basic Info", icon: User },
@@ -169,6 +177,7 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSelectingFile, setIsSelectingFile] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [pendingPhotos, setPendingPhotos] = useState<Record<string, File>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -190,7 +199,7 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
       if (submitError === "Please correct the highlighted fields.") {
         setSubmitError("");
       }
-    }
+    },
   );
 
   const toggleInterest = (interest: string) => {
@@ -203,15 +212,26 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
   };
 
   const handlePhotoUpload = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+
+    setupFilePickerFocusListener(() => {
+      setIsSelectingFile(false);
+    });
+
+    setIsSelectingFile(true);
     fileInputRef.current?.click();
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setIsSelectingFile(false);
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert("File size should be less than 5MB");
+    const validation = validateImageFile(file);
+    if (!validation.isValid) {
+      alert(validation.error);
       return;
     }
 
@@ -250,9 +270,10 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
       if (formErrors) {
         setErrors(formErrors);
         setSubmitError("Please correct the highlighted fields.");
-        
+
         const firstErrorField = Object.keys(formErrors)[0];
-        const elementId = firstErrorField === "dateOfBirth" ? "dob" : firstErrorField;
+        const elementId =
+          firstErrorField === "dateOfBirth" ? "dob" : firstErrorField;
         const element = document.getElementById(elementId);
         if (element) {
           element.focus();
@@ -281,18 +302,7 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
             if (!newPhotos.includes(url)) continue;
 
             const file = pendingPhotos[url];
-            const fileExt = file.name.split(".").pop();
-            const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-            const { error: uploadError } = await supabase.storage
-              .from("photos")
-              .upload(fileName, file);
-
-            if (uploadError) throw uploadError;
-
-            const {
-              data: { publicUrl },
-            } = supabase.storage.from("photos").getPublicUrl(fileName);
+            const publicUrl = await uploadPhotoToSupabase(file, user.id);
 
             // Replace the blob URL with the actual Supabase URL
             const index = newPhotos.indexOf(url);
@@ -335,10 +345,11 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
       setErrors(formErrors);
       setSubmitError("Please correct the highlighted fields.");
       setCurrentStep(1); // Go back to step 1 where the required fields are
-      
+
       setTimeout(() => {
         const firstErrorField = Object.keys(formErrors)[0];
-        const elementId = firstErrorField === "dateOfBirth" ? "dob" : firstErrorField;
+        const elementId =
+          firstErrorField === "dateOfBirth" ? "dob" : firstErrorField;
         const element = document.getElementById(elementId);
         if (element) {
           element.focus();
@@ -497,7 +508,9 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
                       label="First Name"
                       requiredField
                       value={formData.firstName}
-                      onChange={(e) => updateFormData("firstName", e.target.value)}
+                      onChange={(e) =>
+                        updateFormData("firstName", e.target.value)
+                      }
                       onBlur={() => handleBlur("firstName")}
                       error={errors.firstName}
                       placeholder="Enter your first name"
@@ -507,7 +520,9 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
                       label="Last Name"
                       requiredField
                       value={formData.lastName}
-                      onChange={(e) => updateFormData("lastName", e.target.value)}
+                      onChange={(e) =>
+                        updateFormData("lastName", e.target.value)
+                      }
                       onBlur={() => handleBlur("lastName")}
                       error={errors.lastName}
                       placeholder="Enter your last name"
@@ -521,7 +536,9 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
                     requiredField
                     icon={<Calendar className="h-4 w-4" />}
                     value={formData.dateOfBirth}
-                    onChange={(e) => updateFormData("dateOfBirth", e.target.value)}
+                    onChange={(e) =>
+                      updateFormData("dateOfBirth", e.target.value)
+                    }
                     onBlur={() => handleBlur("dateOfBirth")}
                     error={errors.dateOfBirth}
                   />
@@ -535,7 +552,12 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
                       value={formData.gender}
                       onValueChange={(value) => updateFormData("gender", value)}
                       onBlur={() => handleBlur("gender")}
-                      className={cn("flex gap-4 p-1", errors.gender ? "rounded-md border border-destructive" : "")}
+                      className={cn(
+                        "flex gap-4 p-1",
+                        errors.gender
+                          ? "rounded-md border border-destructive"
+                          : "",
+                      )}
                     >
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="male" id="male" />
@@ -556,7 +578,11 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
                         </Label>
                       </div>
                     </RadioGroup>
-                    {errors.gender && <p className="text-sm text-destructive">{errors.gender}</p>}
+                    {errors.gender && (
+                      <p className="text-sm text-destructive">
+                        {errors.gender}
+                      </p>
+                    )}
                   </div>
 
                   <div className="grid sm:grid-cols-2 gap-4">
@@ -657,7 +683,9 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
                   <ProfileSelect
                     label="Preferred Religion"
                     value={formData.preferredReligion}
-                    onValueChange={(v) => updateFormData("preferredReligion", v)}
+                    onValueChange={(v) =>
+                      updateFormData("preferredReligion", v)
+                    }
                     options={religions}
                     placeholder="Select religion"
                   />
@@ -666,7 +694,9 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
                     id="preferredCity"
                     label="Preferred City"
                     value={formData.preferredCity}
-                    onChange={(e) => updateFormData("preferredCity", e.target.value)}
+                    onChange={(e) =>
+                      updateFormData("preferredCity", e.target.value)
+                    }
                     placeholder="Enter preferred city (or leave blank for any)"
                   />
                 </>
@@ -708,16 +738,18 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
                     {allowPhotoUpload && formData.photos.length < 6 && (
                       <button
                         onClick={handlePhotoUpload}
-                        disabled={isUploading}
+                        disabled={isUploading || isSelectingFile}
                         className="aspect-square rounded-xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {isUploading ? (
+                        {isUploading || isSelectingFile ? (
                           <Loader2 className="h-8 w-8 animate-spin" />
                         ) : (
                           <Upload className="h-8 w-8" />
                         )}
                         <span className="text-sm">
-                          {isUploading ? "Uploading..." : "Add Photo"}
+                          {isUploading || isSelectingFile
+                            ? "Uploading..."
+                            : "Add Photo"}
                         </span>
                       </button>
                     )}
@@ -744,7 +776,12 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
                 <>
                   <div className="grid sm:grid-cols-2 gap-4">
                     <ProfileSelect
-                      label={<><GraduationCap className="h-4 w-4 inline mr-2" />Education</>}
+                      label={
+                        <>
+                          <GraduationCap className="h-4 w-4 inline mr-2" />
+                          Education
+                        </>
+                      }
                       value={formData.education}
                       onValueChange={(v) => updateFormData("education", v)}
                       options={educationLevels}
@@ -752,7 +789,12 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
                     />
 
                     <ProfileSelect
-                      label={<><Briefcase className="h-4 w-4 inline mr-2" />Profession</>}
+                      label={
+                        <>
+                          <Briefcase className="h-4 w-4 inline mr-2" />
+                          Profession
+                        </>
+                      }
                       value={formData.profession}
                       onValueChange={(v) => updateFormData("profession", v)}
                       options={professions}
@@ -770,7 +812,12 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
                     />
 
                     <ProfileSelect
-                      label={<><Home className="h-4 w-4 inline mr-2" />Family Type</>}
+                      label={
+                        <>
+                          <Home className="h-4 w-4 inline mr-2" />
+                          Family Type
+                        </>
+                      }
                       value={formData.familyType}
                       onValueChange={(v) => updateFormData("familyType", v)}
                       options={familyTypes}
@@ -926,9 +973,8 @@ export function ProfileSetupWizard(props: ProfileSetupWizardProps = {}) {
                         </p>
                         <p className="text-sm text-muted-foreground">
                           {formData.city || "City"},{" "}
-                          {states.find(
-                            (s) => s.value === formData.state,
-                          )?.label ||
+                          {states.find((s) => s.value === formData.state)
+                            ?.label ||
                             formData.state ||
                             "State"}
                         </p>
